@@ -25,6 +25,7 @@ services:
     volumes:
       - /app/django_app/frontend/node_modules
       - ./django_app:/app/django_app/
+      - C:/Users/VallimohamedJunaid(I/Desktop/:/app/output/
     ports:
       - "8090:8090"
     healthcheck:

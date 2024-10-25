@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Sequence, Union
 
 from elasticsearch import Elasticsearch
 from elasticsearch.helpers import scan
@@ -9,10 +9,12 @@ from langchain_core.documents import Document
 from langchain_core.embeddings.embeddings import Embeddings
 from langchain_core.retrievers import BaseRetriever
 from langchain_elasticsearch.retrievers import ElasticsearchRetriever
-
+from opensearchpy import OpenSearch
 from redbox.models.chain import RedboxState
 from redbox.models.file import ChunkResolution
-from redbox.retriever.queries import add_document_filter_scores_to_query, build_document_query, get_all, get_metadata
+from redbox.retriever.queries import (add_document_filter_scores_to_query,
+                                      build_document_query, get_all,
+                                      get_metadata)
 from redbox.transform import merge_documents, sort_documents
 
 
@@ -78,7 +80,8 @@ def filter_by_elbow(
 class ParameterisedElasticsearchRetriever(BaseRetriever):
     """A modified ElasticsearchRetriever that allows configuration from RedboxState."""
 
-    es_client: Elasticsearch
+    #es_client: Elasticsearch
+    es_client: Union[Elasticsearch, OpenSearch]
     index_name: str | Sequence[str]
     embedding_model: Embeddings
     embedding_field_name: str = "embedding"
@@ -129,6 +132,8 @@ class ParameterisedElasticsearchRetriever(BaseRetriever):
 class AllElasticsearchRetriever(ElasticsearchRetriever):
     """A modified ElasticsearchRetriever that allows retrieving whole documents."""
 
+    es_client: Union[Elasticsearch, OpenSearch]  # Allow both Elasticsearch and OpenSearch
+
     chunk_resolution: ChunkResolution = ChunkResolution.largest
 
     def __init__(self, **kwargs: Any) -> None:
@@ -154,6 +159,12 @@ class AllElasticsearchRetriever(ElasticsearchRetriever):
         ]
 
         return sorted(results, key=lambda result: result.metadata["index"])
+
+
+# Create a new retriever class that works with OpenSearch
+class AllOpenSearchRetriever(AllElasticsearchRetriever):
+    def __init__(self, es_client: Union[Elasticsearch, OpenSearch], **kwargs):
+        super().__init__(es_client=es_client, **kwargs)
 
 
 class MetadataRetriever(ElasticsearchRetriever):

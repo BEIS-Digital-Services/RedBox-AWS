@@ -4,23 +4,23 @@ from functools import lru_cache
 from typing import Literal
 
 import boto3
+import redbox.models.patch_opensearch
 from elasticsearch import Elasticsearch
-from pydantic import BaseModel
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from langchain_elasticsearch import _utilities
 from opensearchpy import OpenSearch, RequestsHttpConnection
+from pydantic import BaseModel, Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from redbox.models.chain import ChatLLMBackend
-
 
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
 logger = logging.getLogger()
-
 
 class OpenSearchSettings(BaseModel):
     """settings required for a aws/opensearch"""
 
     model_config = SettingsConfigDict(frozen=True)
-
-    collection_enpdoint: str
+    host: str = "elasticsearch"
+    port: int = 9200
 
 
 class ElasticLocalSettings(BaseModel):
@@ -35,6 +35,7 @@ class ElasticLocalSettings(BaseModel):
     version: str = "8.11.0"
     password: str = "redboxpass"
     subscription_level: str = "basic"
+    collection_enpdoint: str
 
 
 class ElasticCloudSettings(BaseModel):
@@ -75,7 +76,8 @@ class Settings(BaseSettings):
     partition_strategy: Literal["auto", "fast", "ocr_only", "hi_res"] = "fast"
     clustering_strategy: Literal["full"] | None = None
 
-    elastic: ElasticCloudSettings | ElasticLocalSettings | OpenSearchSettings = ElasticLocalSettings()
+    elastic: OpenSearchSettings = Field(default_factory=lambda: OpenSearchSettings(collection_enpdoint=os.getenv("ELASTIC__COLLECTION_ENPDOINT")))
+    
     elastic_root_index: str = "redbox-data"
     elastic_chunk_alias: str = "redbox-data-chunk-current"
 
@@ -112,7 +114,7 @@ class Settings(BaseSettings):
 
     unstructured_host: str = "unstructured"
 
-    model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", extra="allow", frozen=True)
+    model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", extra="ignore", frozen=True)
 
     ## Prompts
     metadata_prompt: tuple = (
@@ -129,36 +131,51 @@ class Settings(BaseSettings):
 
     @lru_cache(1)
     def elasticsearch_client(self) -> Elasticsearch:
-        if isinstance(self.elastic, ElasticLocalSettings):
-            client = Elasticsearch(
-                hosts=[
-                    {
-                        "host": self.elastic.host,
-                        "port": self.elastic.port,
-                        "scheme": self.elastic.scheme,
-                    }
-                ],
-                basic_auth=(self.elastic.user, self.elastic.password),
-            )
 
-        elif isinstance(self.elastic, OpenSearchSettings):
-            client = OpenSearch(
-                hosts=[{"host": self.collection_enpdoint, "port": 443}],
-                use_ssl=True,
-                verify_certs=True,
-                connection_class=RequestsHttpConnection,
-                pool_maxsize=100,
-            )
+        # Specify the directory and file path
+        output_dir = "/app/output"
+        file_path = os.path.join(output_dir, "elastic.txt")
 
-        else:
-            client = Elasticsearch(cloud_id=self.elastic.cloud_id, api_key=self.elastic.api_key)
+        # Ensure the directory exists
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+        # Writing to the file
+        with open(file_path, 'w') as file:
+            file.write(f"{os.getenv("ELASTIC__COLLECTION_ENPDOINT")}, {isinstance(self.elastic, ElasticLocalSettings)}, {isinstance(self.elastic, OpenSearchSettings)}")
+
+        #if isinstance(self.elastic, ElasticLocalSettings):
+        #    client = Elasticsearch(
+        #        hosts=[
+        #            {
+        #                "host": self.elastic.host,
+        #                "port": self.elastic.port,
+        #                "scheme": self.elastic.scheme,
+        #            }
+        #        ],
+        #        basic_auth=(self.elastic.user, self.elastic.password),
+        #    ).options(request_timeout=30, retry_on_timeout=True, max_retries=3)
+#
+        #elif isinstance(self.elastic, OpenSearchSettings):
+        client = OpenSearch(
+            hosts=[{"host": self.elastic.host, "port": self.elastic.port}],
+            use_ssl=False,
+            verify_certs=False,
+            connection_class=RequestsHttpConnection,
+            pool_maxsize=100,
+            timeout=30,  # Set timeout here instead of using `.options`
+            max_retries=3,  # Set retry options here instead
+        )
+
+        #else:
+        #    client = Elasticsearch(cloud_id=self.elastic.cloud_id, api_key=self.elastic.api_key)
 
         if not client.indices.exists_alias(name=f"{self.elastic_root_index}-chunk-current"):
             chunk_index = f"{self.elastic_root_index}-chunk"
             client.options(ignore_status=[400]).indices.create(index=chunk_index)
             client.indices.put_alias(index=chunk_index, name=f"{self.elastic_root_index}-chunk-current")
 
-        return client.options(request_timeout=30, retry_on_timeout=True, max_retries=3)
+        return client
 
     def s3_client(self):
         if self.object_store == "minio":

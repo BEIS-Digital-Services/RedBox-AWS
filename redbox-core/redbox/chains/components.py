@@ -1,27 +1,25 @@
 import logging
-
 import os
 from functools import cache
 
 import tiktoken
-
 from dotenv import load_dotenv
+from langchain.chat_models import init_chat_model
+from langchain_community.embeddings import BedrockEmbeddings
 from langchain_core.embeddings import Embeddings, FakeEmbeddings
 from langchain_core.tools import StructuredTool
 from langchain_core.utils import convert_to_secret_str
 from langchain_elasticsearch import ElasticsearchRetriever
 from langchain_openai.embeddings import AzureOpenAIEmbeddings, OpenAIEmbeddings
-
-from redbox.models.settings import Settings
-from redbox.retriever import AllElasticsearchRetriever, ParameterisedElasticsearchRetriever, MetadataRetriever
-from langchain_community.embeddings import BedrockEmbeddings
-from langchain.chat_models import init_chat_model
+from opensearchpy import OpenSearch
 from redbox.models.chain import ChatLLMBackend
-
+from redbox.models.settings import Settings
+from redbox.retriever import (AllElasticsearchRetriever,
+                              AllOpenSearchRetriever, MetadataRetriever,
+                              ParameterisedElasticsearchRetriever)
 
 logger = logging.getLogger(__name__)
 load_dotenv()
-
 
 def get_chat_llm(model: ChatLLMBackend, tools: list[StructuredTool] | None = None):
     logger.info("initialising model=%s model_provider=%s tools=%s", model.name, model.provider, tools)
@@ -79,11 +77,26 @@ def get_embeddings(env: Settings) -> Embeddings:
     raise Exception("No configured embedding model")
 
 
-def get_all_chunks_retriever(env: Settings) -> ElasticsearchRetriever:
-    return AllElasticsearchRetriever(
-        es_client=env.elasticsearch_client(),
-        index_name=env.elastic_chunk_alias,
-    )
+#def get_all_chunks_retriever(env: Settings) -> ElasticsearchRetriever:
+#    return AllElasticsearchRetriever(
+#        es_client=env.elasticsearch_client(),
+#        index_name=env.elastic_chunk_alias,
+#    )
+
+
+def get_all_chunks_retriever(env: Settings):
+    if isinstance(env.elasticsearch_client(), OpenSearch):
+        # If the client is OpenSearch, return AllOpenSearchRetriever
+        return AllOpenSearchRetriever(
+            es_client=env.elasticsearch_client(),
+            index_name=env.elastic_chunk_alias,
+        )
+    else:
+        # Otherwise, use the default Elasticsearch retriever
+        return AllElasticsearchRetriever(
+            es_client=env.elasticsearch_client(),
+            index_name=env.elastic_chunk_alias,
+        )
 
 
 def get_parameterised_retriever(env: Settings, embeddings: Embeddings | None = None):
