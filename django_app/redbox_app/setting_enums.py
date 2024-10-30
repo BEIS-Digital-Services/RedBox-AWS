@@ -12,10 +12,22 @@ class Environment(StrEnum):
         obj.is_test = is_test
         obj.hosts = hosts
         return obj
-
+    
     @property
     def is_local(self) -> bool:
         return self is Environment.LOCAL
+    
+    @property
+    def is_dev(self) -> bool:
+        return self is Environment.DEV
+    
+    @property
+    def is_preprod(self) -> bool:
+        return self is Environment.PREPROD
+    
+    @property
+    def is_prod(self) -> bool:
+        return self is Environment.PROD
 
     @property
     def uses_minio(self) -> bool:

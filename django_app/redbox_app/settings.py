@@ -13,11 +13,11 @@ from import_export.formats.base_formats import CSV
 from sentry_sdk.integrations.django import DjangoIntegration
 from storages.backends import s3boto3
 from yarl import URL
+from django.http import HttpRequest
 
 from redbox_app.setting_enums import Classification, Environment
 
 logger = logging.getLogger(__name__)
-
 
 load_dotenv()
 
@@ -164,18 +164,32 @@ OIDC_CLAIM_MAPPING = {
     'name': 'name',
 }
 
-OIDC_OP_ISSUER = 'https://dev-99472302.okta.com/oauth2/default'
-OIDC_RP_CALLBACK_URL = 'http://localhost:8090/oidc/callback/'  # Explicitly define your callback URL
+SITE_DOMAIN = "http://localhost:8090"
+OKTA_DOMAIN = env.str("OKTA_DOMAIN")
+OIDC_OP_ISSUER = f'https://{OKTA_DOMAIN}/oauth2/default'
+OIDC_RP_CALLBACK_URL = f'{SITE_DOMAIN}/oidc/callback/'
 OIDC_RP_USE_PKCE = True
 OIDC_PKCE_CODE_CHALLENGE_METHOD = 'S256'
-OIDC_RP_CLIENT_ID = '0oakd00lbw0G1UJCW5d7'
-OIDC_RP_CLIENT_SECRET = 'cuvLLZvttn6jRPGl0-3qllYBYhi4upF_fvH_Lk5kzaM_1d201v9aH2Am6ot1uSA7'
-OIDC_OP_AUTHORIZATION_ENDPOINT = 'https://dev-99472302.okta.com/oauth2/default/v1/authorize'
-OIDC_OP_TOKEN_ENDPOINT = 'https://dev-99472302.okta.com/oauth2/default/v1/token'
-OIDC_OP_USER_ENDPOINT = 'https://dev-99472302.okta.com/oauth2/default/v1/userinfo'
-OIDC_OP_JWKS_ENDPOINT = 'https://dev-99472302.okta.com/oauth2/default/v1/keys'
+
+if ENVIRONMENT.is_local:
+    OIDC_RP_CLIENT_ID = env.str("OIDC_RP_CLIENT_ID_LOCAL")
+    OIDC_RP_CLIENT_SECRET = env.str("OIDC_RP_CLIENT_SECRET_LOCAL")
+elif ENVIRONMENT.is_dev:
+    OIDC_RP_CLIENT_ID = env.str("OIDC_RP_CLIENT_ID_DEV")
+    OIDC_RP_CLIENT_SECRET = env.str("OIDC_RP_CLIENT_SECRET_DEV")
+elif ENVIRONMENT.is_preprod:
+    OIDC_RP_CLIENT_ID = env.str("OIDC_RP_CLIENT_ID_PREPROD")
+    OIDC_RP_CLIENT_SECRET = env.str("OIDC_RP_CLIENT_SECRET_PREPROD")
+elif ENVIRONMENT.is_prod:
+    OIDC_RP_CLIENT_ID = env.str("OIDC_RP_CLIENT_ID_PROD")
+    OIDC_RP_CLIENT_SECRET = env.str("OIDC_RP_CLIENT_SECRET_PROD")
+
+OIDC_OP_AUTHORIZATION_ENDPOINT = f'https://{OKTA_DOMAIN}/oauth2/default/v1/authorize'
+OIDC_OP_TOKEN_ENDPOINT = f'https://{OKTA_DOMAIN}/oauth2/default/v1/token'
+OIDC_OP_USER_ENDPOINT = f'https://{OKTA_DOMAIN}/oauth2/default/v1/userinfo'
+OIDC_OP_JWKS_ENDPOINT = f'https://{OKTA_DOMAIN}/oauth2/default/v1/keys'
 OIDC_RP_SIGN_ALGO = 'RS256'
-LOGOUT_REDIRECT_URL = 'http://localhost:8090/'
+LOGOUT_REDIRECT_URL = f'{SITE_DOMAIN}'
 LOGIN_URL = '/oidc/authenticate/'
 
 ##if LOGIN_METHOD == "sso":
