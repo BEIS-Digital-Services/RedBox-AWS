@@ -69,10 +69,8 @@ INSTALLED_APPS = [
     "django_plotly_dash.apps.DjangoPlotlyDashConfig",
     "adminplus",
     "waffle",
+    "mozilla_django_oidc"
 ]
-
-if LOGIN_METHOD == "sso":
-    INSTALLED_APPS.append("authbroker_client")
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -127,10 +125,11 @@ ASGI_APPLICATION = "redbox_app.asgi.application"
 
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
+    "redbox_app.oidc_auth.CustomOIDCAuthenticationBackend"
 ]
 
-if LOGIN_METHOD == "sso":
-    AUTHENTICATION_BACKENDS.append("authbroker_client.backends.AuthbrokerBackend")
+#if LOGIN_METHOD == "sso":
+#    AUTHENTICATION_BACKENDS.append("authbroker_client.backends.AuthbrokerBackend")
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -160,13 +159,32 @@ SITE_ID = 1
 AUTH_USER_MODEL = "redbox_core.User"
 ACCOUNT_EMAIL_VERIFICATION = "none"
 
-if LOGIN_METHOD == "sso":
-    AUTHBROKER_URL = env.str("AUTHBROKER_URL")
-    AUTHBROKER_CLIENT_ID = env.str("AUTHBROKER_CLIENT_ID")
-    AUTHBROKER_CLIENT_SECRET = env.str("AUTHBROKER_CLIENT_SECRET")
-    LOGIN_URL = reverse_lazy("authbroker_client:login")
-    LOGIN_REDIRECT_URL = reverse_lazy("homepage")
-elif LOGIN_METHOD == "magic_link":
+OIDC_CLAIM_MAPPING = {
+    'email': 'email',
+    'name': 'name',
+}
+
+OIDC_OP_ISSUER = 'https://dev-99472302.okta.com/oauth2/default'
+OIDC_RP_CALLBACK_URL = 'http://localhost:8090/oidc/callback/'  # Explicitly define your callback URL
+OIDC_RP_USE_PKCE = True
+OIDC_PKCE_CODE_CHALLENGE_METHOD = 'S256'
+OIDC_RP_CLIENT_ID = '0oakd00lbw0G1UJCW5d7'
+OIDC_RP_CLIENT_SECRET = 'cuvLLZvttn6jRPGl0-3qllYBYhi4upF_fvH_Lk5kzaM_1d201v9aH2Am6ot1uSA7'
+OIDC_OP_AUTHORIZATION_ENDPOINT = 'https://dev-99472302.okta.com/oauth2/default/v1/authorize'
+OIDC_OP_TOKEN_ENDPOINT = 'https://dev-99472302.okta.com/oauth2/default/v1/token'
+OIDC_OP_USER_ENDPOINT = 'https://dev-99472302.okta.com/oauth2/default/v1/userinfo'
+OIDC_OP_JWKS_ENDPOINT = 'https://dev-99472302.okta.com/oauth2/default/v1/keys'
+OIDC_RP_SIGN_ALGO = 'RS256'
+LOGOUT_REDIRECT_URL = 'http://localhost:8090/'
+LOGIN_URL = '/oidc/authenticate/'
+
+##if LOGIN_METHOD == "sso":
+##    AUTHBROKER_URL = env.str("AUTHBROKER_URL")
+##    AUTHBROKER_CLIENT_ID = env.str("AUTHBROKER_CLIENT_ID")
+##    AUTHBROKER_CLIENT_SECRET = env.str("AUTHBROKER_CLIENT_SECRET")
+##    LOGIN_URL = reverse_lazy("authbroker_client:login")
+##    LOGIN_REDIRECT_URL = reverse_lazy("homepage")
+if LOGIN_METHOD == "magic_link":
     SESSION_COOKIE_SAMESITE = "Strict"
     LOGIN_REDIRECT_URL = "homepage"
     LOGIN_URL = "sign-in"
@@ -234,7 +252,7 @@ CSRF_COOKIE_HTTPONLY = True
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_AGE = 60 * 60 * 24
-SESSION_COOKIE_SAMESITE = "Strict"
+SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
 
 LOG_ROOT = "."
@@ -265,6 +283,9 @@ if ENVIRONMENT.uses_minio:
     MINIO_PORT = env.str("MINIO_PORT")
     MINIO_ENDPOINT = f"http://{MINIO_HOST}:{MINIO_PORT}"
     AWS_S3_ENDPOINT_URL = MINIO_ENDPOINT
+    SESSION_COOKIE_SECURE = False
+    SECURE_HSTS_SECONDS = 0  # Disable HSTS in development
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = False
 else:
     # https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security
     # Mozilla guidance max-age 2 years
