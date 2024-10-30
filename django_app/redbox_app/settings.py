@@ -164,7 +164,11 @@ OIDC_CLAIM_MAPPING = {
     'name': 'name',
 }
 
-SITE_DOMAIN = "http://localhost:8090"
+if ENVIRONMENT.is_local:
+    SITE_DOMAIN = f"http://{ENVIRONMENT.hosts[0]}:8090"
+else:
+    SITE_DOMAIN = f"https://{ENVIRONMENT.hosts[0]}"
+
 OKTA_DOMAIN = env.str("OKTA_DOMAIN")
 OIDC_OP_ISSUER = f'https://{OKTA_DOMAIN}/oauth2/default'
 OIDC_RP_CALLBACK_URL = f'{SITE_DOMAIN}/oidc/callback/'
