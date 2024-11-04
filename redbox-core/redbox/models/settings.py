@@ -16,6 +16,7 @@ from redbox_app.setting_enums import Environment
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
 logger = logging.getLogger()
 env = environ.Env()
+ENVIRONMENT = Environment[env.str("ENVIRONMENT").upper()]
 
 
 class OpenSearchSettings(BaseModel):
@@ -144,6 +145,7 @@ class Settings(BaseSettings):
         if ENVIRONMENT.is_local:
             auth = ("admin", "MyStrongPassword1!")
             use_ssl = False
+            verify_certs = True
             port = 9200
         else:
             credentials = boto3.Session().get_credentials()
