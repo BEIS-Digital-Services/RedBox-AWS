@@ -145,16 +145,16 @@ class Settings(BaseSettings):
         if ENVIRONMENT.is_local:
             auth = ("admin", "MyStrongPassword1!")
             use_ssl = False
-            verify_certs = True
+            verify_certs = False
             port = 9200
         else:
             credentials = boto3.Session().get_credentials()
             auth = AWSV4SignerAuth(credentials, "eu-west-2")
             use_ssl = True
-            verify_certs = False
+            verify_certs = True
             port = 443
         client = OpenSearch(
-            hosts=[{"host": "opensearch", "port": port}],
+            hosts=[{"host": env.str("ELASTIC__COLLECTION_ENPDOINT"), "port": port}],
             http_auth=auth,
             use_ssl=use_ssl,
             verify_certs=verify_certs,
