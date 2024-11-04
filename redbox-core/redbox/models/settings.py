@@ -7,10 +7,11 @@ import boto3
 import environ
 from elasticsearch import Elasticsearch
 from openai import max_retries
-from opensearchpy import OpenSearch, RequestsHttpConnection
+from opensearchpy import AWSV4SignerAuth, OpenSearch, RequestsHttpConnection
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from redbox.models.chain import ChatLLMBackend
+from redbox_app.setting_enums import Environment
 
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
 logger = logging.getLogger()
@@ -140,11 +141,21 @@ class Settings(BaseSettings):
     @lru_cache(1)
     def elasticsearch_client(self) -> Union[Elasticsearch, OpenSearch]:
         logger.info("Testing OpenSearch is definitely being used")
+        if ENVIRONMENT.is_local:
+            auth = ("admin", "MyStrongPassword1!")
+            use_ssl = False
+            port = 9200
+        else:
+            credentials = boto3.Session().get_credentials()
+            auth = AWSV4SignerAuth(credentials, "eu-west-2")
+            use_ssl = True
+            verify_certs = False
+            port = 443
         client = OpenSearch(
-            hosts=[{"host": "opensearch", "port": 9200}],
-            http_auth=("admin", "MyStrongPassword1!"),
-            use_ssl=False,
-            verify_certs=False,
+            hosts=[{"host": "opensearch", "port": port}],
+            http_auth=auth,
+            use_ssl=use_ssl,
+            verify_certs=verify_certs,
             connection_class=RequestsHttpConnection,
             pool_maxsize=100,
             timeout=30,
