@@ -1,30 +1,36 @@
 import logging
-
 import os
 from functools import cache
 
 import tiktoken
-
 from dotenv import load_dotenv
+from langchain.chat_models import init_chat_model
+from langchain_community.embeddings import BedrockEmbeddings
 from langchain_core.embeddings import Embeddings, FakeEmbeddings
 from langchain_core.tools import StructuredTool
 from langchain_core.utils import convert_to_secret_str
 from langchain_elasticsearch import ElasticsearchRetriever
 from langchain_openai.embeddings import AzureOpenAIEmbeddings, OpenAIEmbeddings
-
-from redbox.models.settings import Settings
-from redbox.retriever import AllElasticsearchRetriever, ParameterisedElasticsearchRetriever, MetadataRetriever
-from langchain_community.embeddings import BedrockEmbeddings
-from langchain.chat_models import init_chat_model
 from redbox.models.chain import ChatLLMBackend
-
+from redbox.models.settings import Settings
+from redbox.retriever import (
+    AllElasticsearchRetriever,
+    MetadataRetriever,
+    OpenSearchRetriever,
+    ParameterisedElasticsearchRetriever,
+)
 
 logger = logging.getLogger(__name__)
 load_dotenv()
 
 
 def get_chat_llm(model: ChatLLMBackend, tools: list[StructuredTool] | None = None):
-    logger.info("initialising model=%s model_provider=%s tools=%s", model.name, model.provider, tools)
+    logger.info(
+        "initialising model=%s model_provider=%s tools=%s",
+        model.name,
+        model.provider,
+        tools,
+    )
     chat_model = init_chat_model(
         model=model.name,
         model_provider=model.provider,
@@ -79,7 +85,7 @@ def get_embeddings(env: Settings) -> Embeddings:
     raise Exception("No configured embedding model")
 
 
-def get_all_chunks_retriever(env: Settings) -> ElasticsearchRetriever:
+def get_all_chunks_retriever(env: Settings) -> OpenSearchRetriever:
     return AllElasticsearchRetriever(
         es_client=env.elasticsearch_client(),
         index_name=env.elastic_chunk_alias,

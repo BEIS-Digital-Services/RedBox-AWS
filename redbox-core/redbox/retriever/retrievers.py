@@ -1,6 +1,8 @@
+import logging
 from functools import partial
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Union, cast
 
+import opensearchpy
 from elasticsearch import Elasticsearch
 from elasticsearch.helpers import scan
 from kneed import KneeLocator
@@ -9,11 +11,93 @@ from langchain_core.documents import Document
 from langchain_core.embeddings.embeddings import Embeddings
 from langchain_core.retrievers import BaseRetriever
 from langchain_elasticsearch.retrievers import ElasticsearchRetriever
-
+from opensearchpy import OpenSearch
 from redbox.models.chain import RedboxState
 from redbox.models.file import ChunkResolution
-from redbox.retriever.queries import add_document_filter_scores_to_query, build_document_query, get_all, get_metadata
+from redbox.retriever.queries import (
+    add_document_filter_scores_to_query,
+    build_document_query,
+    get_all,
+    get_metadata,
+)
 from redbox.transform import merge_documents, sort_documents
+
+logger = logging.getLogger(__name__)
+
+
+class OpenSearchRetriever(BaseRetriever):
+    """OpenSearch Retriever."""
+
+    es_client: OpenSearch
+    index_name: Union[str, Sequence[str]]
+    body_func: Callable[[str], Dict]
+    content_field: Optional[Union[str, Mapping[str, str]]] = None
+    document_mapper: Optional[Callable[[Mapping], Document]] = None
+
+    def __init__(self, **kwargs: Any):
+        super().__init__(**kwargs)
+        self.content_field = str(self.content_field)
+
+        # if self.content_field is None and self.document_mapper is None:
+        #     raise ValueError("Either content_field or document_mapper must be provided")
+
+        # if self.content_field is not None and self.document_mapper is not None:
+        #     raise ValueError("Only one of content_field or document_mapper can be provided")
+
+        if not self.document_mapper:
+            self.document_mapper = self._single_field_mapper
+        elif isinstance(self.content_field, Mapping):
+            self.document_mapper = self._multi_field_mapper
+        # else:
+        #     print(self.content_field)
+        #     raise ValueError("content_field must be a string or a mapping")
+
+        # self.os_client = create_opensearch_client(**kwargs)
+
+    @staticmethod
+    def from_os_params(
+        self,
+        index_name: Union[str, Sequence[str]],
+        body_func: Callable[[str], Dict],
+        content_field: Optional[Union[str, Mapping[str, str]]] = None,
+        document_mapper: Optional[Callable[[Mapping], Document]] = None,
+        opensearch_url: Optional[str] = None,
+        cloud_id: Optional[str] = None,
+        api_key: Optional[str] = None,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        params: Optional[Dict[str, Any]] = None,
+    ) -> "OpenSearchRetriever":
+
+        es_client = self.es_client
+        return OpenSearchRetriever(
+            es_client=es_client,
+            index_name=index_name,
+            body_func=body_func,
+            content_field=content_field,
+            document_mapper=document_mapper,
+        )
+
+    def _get_relevant_documents(
+        self, query: str, *, run_manager: CallbackManagerForRetrieverRun
+    ) -> List[Document]:
+        if not self.es_client or not self.document_mapper:
+            raise ValueError("OpenSearch client or document mapper is not initialized")
+
+        body = self.body_func(query)
+        logger.info(body)
+        response = self.es_client.search(index=self.index_name, body=body)
+        return [self.document_mapper(hit) for hit in response["hits"]["hits"]]
+
+    def _single_field_mapper(self, hit: Mapping[str, Any]) -> Document:
+        content = hit["_source"].pop(self.content_field)
+        return Document(page_content=content, metadata=hit)
+
+    def _multi_field_mapper(self, hit: Mapping[str, Any]) -> Document:
+        self.content_field = cast(Mapping, self.content_field)
+        field = self.content_field[hit["_index"]]
+        content = hit["_source"].pop(field)
+        return Document(page_content=content, metadata=hit)
 
 
 def hit_to_doc(hit: dict[str, Any]) -> Document:
@@ -31,11 +115,14 @@ def hit_to_doc(hit: dict[str, Any]) -> Document:
     }
     return Document(
         page_content=source.get("text", ""),
-        metadata={k: v for k, v in c_meta.items() if v is not None} | source["metadata"],
+        metadata={k: v for k, v in c_meta.items() if v is not None}
+        | source["metadata"],
     )
 
 
-def query_to_documents(es_client: Elasticsearch, index_name: str, query: dict[str, Any]) -> list[Document]:
+def query_to_documents(
+    es_client: Union[Elasticsearch, OpenSearch], index_name: str, query: dict[str, Any]
+) -> list[Document]:
     """Runs an Elasticsearch query and returns Documents."""
     response = es_client.search(index=index_name, body=query)
     return [hit_to_doc(hit) for hit in response["hits"]["hits"]]
@@ -67,7 +154,9 @@ def filter_by_elbow(
             rank = range(len(scores))
 
             # Convex curve, decreasing direction as scores descend in a pareto-like fashion
-            kn = KneeLocator(rank, scores, S=sensitivity, curve="convex", direction="decreasing")
+            kn = KneeLocator(
+                rank, scores, S=sensitivity, curve="convex", direction="decreasing"
+            )
             return docs[: kn.elbow]
         else:
             return docs
@@ -78,7 +167,7 @@ def filter_by_elbow(
 class ParameterisedElasticsearchRetriever(BaseRetriever):
     """A modified ElasticsearchRetriever that allows configuration from RedboxState."""
 
-    es_client: Elasticsearch
+    es_client: Union[Elasticsearch, OpenSearch]
     index_name: str | Sequence[str]
     embedding_model: Embeddings
     embedding_field_name: str = "embedding"
@@ -118,22 +207,29 @@ class ParameterisedElasticsearchRetriever(BaseRetriever):
             centres=initial_documents,
         )
         adjacent_boosted = query_to_documents(
-            es_client=self.es_client, index_name=self.index_name, query=with_adjacent_query
+            es_client=self.es_client,
+            index_name=self.index_name,
+            query=with_adjacent_query,
         )
 
         # Merge, sort, return
-        merged_documents = merge_documents(initial=initial_documents, adjacent=adjacent_boosted)
+        merged_documents = merge_documents(
+            initial=initial_documents, adjacent=adjacent_boosted
+        )
         return sort_documents(documents=merged_documents)
 
 
-class AllElasticsearchRetriever(ElasticsearchRetriever):
+class AllElasticsearchRetriever(OpenSearchRetriever):
     """A modified ElasticsearchRetriever that allows retrieving whole documents."""
 
     chunk_resolution: ChunkResolution = ChunkResolution.largest
 
-    def __init__(self, **kwargs: Any) -> None:
+    def __init__(
+        self, es_client: Union[Elasticsearch, OpenSearch], **kwargs: Any
+    ) -> None:
         # Hack to pass validation before overwrite
         # Partly necessary due to how .with_config() interacts with a retriever
+        kwargs["es_client"] = es_client
         kwargs["body_func"] = get_all
         kwargs["document_mapper"] = hit_to_doc
         super().__init__(**kwargs)
@@ -142,45 +238,52 @@ class AllElasticsearchRetriever(ElasticsearchRetriever):
     def _get_relevant_documents(
         self, query: RedboxState, *, run_manager: CallbackManagerForRetrieverRun
     ) -> list[Document]:  # noqa:ARG002
-        if not self.es_client or not self.document_mapper:
-            msg = "faulty configuration"
-            raise ValueError(msg)  # should not happen
+        # if not self.es_client or not self.document_mapper:
+        #    msg = "faulty configuration"
+        #    raise ValueError(msg)  # should not happen
 
         body = self.body_func(query)  # type: ignore
 
         results = [
             self.document_mapper(hit)
-            for hit in scan(client=self.es_client, index=self.index_name, query=body, source=True)
+            for hit in scan(
+                client=self.es_client, index=self.index_name, query=body, source=True
+            )
         ]
 
         return sorted(results, key=lambda result: result.metadata["index"])
 
 
-class MetadataRetriever(ElasticsearchRetriever):
+class MetadataRetriever(OpenSearchRetriever):
     """A modified ElasticsearchRetriever that retrieves query metadata without any content"""
 
     chunk_resolution: ChunkResolution = ChunkResolution.largest
 
-    def __init__(self, **kwargs: Any) -> None:
+    def __init__(
+        self, es_client: Union[Elasticsearch, OpenSearch], **kwargs: Any
+    ) -> None:
         # Hack to pass validation before overwrite
         # Partly necessary due to how .with_config() interacts with a retriever
         kwargs["body_func"] = get_metadata
         kwargs["document_mapper"] = hit_to_doc
+        kwargs["es_client"] = es_client
         super().__init__(**kwargs)
         self.body_func = partial(get_metadata, self.chunk_resolution)
 
     def _get_relevant_documents(
         self, query: RedboxState, *, run_manager: CallbackManagerForRetrieverRun
     ) -> list[Document]:  # noqa:ARG002
-        if not self.es_client or not self.document_mapper:
-            msg = "faulty configuration"
-            raise ValueError(msg)  # should not happen
+        # if not self.es_client or not self.document_mapper:
+        #    msg = "faulty configuration"
+        #    raise ValueError(msg)  # should not happen
 
         body = self.body_func(query)  # type: ignore
 
         results = [
             self.document_mapper(hit)
-            for hit in scan(client=self.es_client, index=self.index_name, query=body, source=True)
+            for hit in scan(
+                client=self.es_client, index=self.index_name, query=body, source=True
+            )
         ]
 
         return sorted(results, key=lambda result: result.metadata["index"])

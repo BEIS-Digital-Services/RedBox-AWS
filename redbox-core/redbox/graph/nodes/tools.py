@@ -1,14 +1,21 @@
-from typing import Annotated, Any, get_args, get_origin, get_type_hints
+from typing import Annotated, Any, Union, get_args, get_origin, get_type_hints
 
 from elasticsearch import Elasticsearch
 from langchain_core.embeddings.embeddings import Embeddings
 from langchain_core.tools import StructuredTool, Tool, tool
 from langgraph.prebuilt import InjectedState
-
+from opensearchpy import OpenSearch
 from redbox.models.file import ChunkResolution
-from redbox.retriever.queries import add_document_filter_scores_to_query, build_document_query
+from redbox.retriever.queries import (
+    add_document_filter_scores_to_query,
+    build_document_query,
+)
 from redbox.retriever.retrievers import query_to_documents
-from redbox.transform import merge_documents, sort_documents, structure_documents_by_group_and_indices
+from redbox.transform import (
+    merge_documents,
+    sort_documents,
+    structure_documents_by_group_and_indices,
+)
 
 
 def is_valid_tool(tool: StructuredTool) -> bool:
@@ -58,7 +65,7 @@ def has_injected_state(tool: StructuredTool) -> bool:
 
 
 def build_search_documents_tool(
-    es_client: Elasticsearch,
+    es_client: Union[Elasticsearch, OpenSearch],
     index_name: str,
     embedding_model: Embeddings,
     embedding_field_name: str,
@@ -67,7 +74,9 @@ def build_search_documents_tool(
     """Constructs a tool that searches the index and sets state["documents"]."""
 
     @tool
-    def _search_documents(query: str, state: Annotated[dict, InjectedState]) -> dict[str, Any]:
+    def _search_documents(
+        query: str, state: Annotated[dict, InjectedState]
+    ) -> dict[str, Any]:
         """
         Search for documents uploaded by the user based on a query string.
 
@@ -98,7 +107,9 @@ def build_search_documents_tool(
             chunk_resolution=chunk_resolution,
             ai_settings=ai_settings,
         )
-        initial_documents = query_to_documents(es_client=es_client, index_name=index_name, query=initial_query)
+        initial_documents = query_to_documents(
+            es_client=es_client, index_name=index_name, query=initial_query
+        )
 
         # Handle nothing found (as when no files are permitted)
         if not initial_documents:
@@ -110,10 +121,14 @@ def build_search_documents_tool(
             ai_settings=ai_settings,
             centres=initial_documents,
         )
-        adjacent_boosted = query_to_documents(es_client=es_client, index_name=index_name, query=with_adjacent_query)
+        adjacent_boosted = query_to_documents(
+            es_client=es_client, index_name=index_name, query=with_adjacent_query
+        )
 
         # Merge and sort
-        merged_documents = merge_documents(initial=initial_documents, adjacent=adjacent_boosted)
+        merged_documents = merge_documents(
+            initial=initial_documents, adjacent=adjacent_boosted
+        )
         sorted_documents = sort_documents(documents=merged_documents)
 
         # Return as state update
