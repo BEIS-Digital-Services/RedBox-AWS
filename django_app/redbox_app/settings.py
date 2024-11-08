@@ -170,7 +170,11 @@ if ENVIRONMENT.is_local:
 else:
     SITE_DOMAIN = f"https://{ENVIRONMENT.hosts[0]}"
 
-OKTA_DOMAIN = env.str("OKTA_DOMAIN")
+if ENVIRONMENT.is_prod:
+    OKTA_DOMAIN = env.str("OKTA_DOMAIN_PROD")
+else:
+    OKTA_DOMAIN = env.str("OKTA_DOMAIN_DEV")
+
 OIDC_OP_ISSUER = f'https://{OKTA_DOMAIN}/oauth2/default'
 OIDC_RP_CALLBACK_URL = f'{SITE_DOMAIN}/oidc/callback/'
 OIDC_RP_USE_PKCE = True
