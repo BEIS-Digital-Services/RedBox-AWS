@@ -162,6 +162,7 @@ ACCOUNT_EMAIL_VERIFICATION = "none"
 OIDC_CLAIM_MAPPING = {
     'email': 'email',
     'name': 'name',
+    'redbox_admin': 'redbox_admin',
 }
 
 if ENVIRONMENT.is_local:

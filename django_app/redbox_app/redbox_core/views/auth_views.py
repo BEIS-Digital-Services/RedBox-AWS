@@ -26,7 +26,7 @@ def oidc_callback(request):
     # Check for state mismatch or missing code
     if not code or not state or state != stored_state:
         logger.error("Invalid callback parameters or state mismatch")
-        return HttpResponseServerError(f"Invalid callback parameters or state mismatch. The value of state is {state} and the value of stored_state is {stored_state} and the value of code is {code}")
+        return HttpResponseServerError(f"Invalid callback parameters or state mismatch.")
 
     # Retrieve code_verifier from the session for PKCE
     code_verifier = request.session.get('code_verifier')

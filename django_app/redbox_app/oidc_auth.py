@@ -7,6 +7,7 @@ from mozilla_django_oidc.auth import OIDCAuthenticationBackend
 from jwt import PyJWKClient
 import jwt
 import logging
+from django.http import HttpRequest, HttpResponseServerError
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -55,6 +56,7 @@ class CustomOIDCAuthenticationBackend(OIDCAuthenticationBackend):
                 issuer=settings.OIDC_OP_ISSUER,
                 options={"verify_exp": True}
             )
+            logger.info(f"Decoded claims from id_token: {claims}")  # Log the claims
             return claims
         except jwt.PyJWTError as e:
             logger.error(f"Failed to decode ID token: {e}")
@@ -76,6 +78,10 @@ class CustomOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         user.verified = True  # Assuming OIDC authenticated users are verified
         user.is_active = True  # Ensure user is active
 
+        if 'is_redbox_admin' in claims:
+            user.is_staff = True
+            user.is_superuser = True
+
         # Save the user
         user.save()
         return user
@@ -84,6 +90,10 @@ class CustomOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         user.name = claims.get('name', user.name)
         user.verified = True
         user.is_active = True  # Ensure user is active
+
+        if 'is_redbox_admin' in claims:
+            user.is_staff = True
+            user.is_superuser = True
 
         # Save the updated user
         user.save()
@@ -105,6 +115,8 @@ class CustomOIDCAuthenticationBackend(OIDCAuthenticationBackend):
 
         # Exchange the authorization code for tokens
         token_data = self.exchange_code_for_token(code, code_verifier)
+
+        logger.info(f"Token data received: {token_data}") #REMOVE
 
         if not token_data or 'id_token' not in token_data:
             logger.error("No id_token found in token response.")
