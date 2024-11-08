@@ -69,7 +69,7 @@
           "initials": request.user.get_initials(),
           "menu_items": [
               {"text": "My details", "href": url('demographics')},
-              {"text": "Sign out", "href": url('signed-out')}
+              {"text": "Sign out", "href": url('oidc_logout')}
           ]
       },
       phase = "Beta"

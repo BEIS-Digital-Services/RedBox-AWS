@@ -13,11 +13,11 @@ from import_export.formats.base_formats import CSV
 from sentry_sdk.integrations.django import DjangoIntegration
 from storages.backends import s3boto3
 from yarl import URL
+from django.http import HttpRequest
 
 from redbox_app.setting_enums import Classification, Environment
 
 logger = logging.getLogger(__name__)
-
 
 load_dotenv()
 
@@ -69,10 +69,8 @@ INSTALLED_APPS = [
     "django_plotly_dash.apps.DjangoPlotlyDashConfig",
     "adminplus",
     "waffle",
+    "mozilla_django_oidc"
 ]
-
-if LOGIN_METHOD == "sso":
-    INSTALLED_APPS.append("authbroker_client")
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -127,10 +125,11 @@ ASGI_APPLICATION = "redbox_app.asgi.application"
 
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
+    "redbox_app.oidc_auth.CustomOIDCAuthenticationBackend"
 ]
 
-if LOGIN_METHOD == "sso":
-    AUTHENTICATION_BACKENDS.append("authbroker_client.backends.AuthbrokerBackend")
+#if LOGIN_METHOD == "sso":
+#    AUTHENTICATION_BACKENDS.append("authbroker_client.backends.AuthbrokerBackend")
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -160,13 +159,51 @@ SITE_ID = 1
 AUTH_USER_MODEL = "redbox_core.User"
 ACCOUNT_EMAIL_VERIFICATION = "none"
 
-if LOGIN_METHOD == "sso":
-    AUTHBROKER_URL = env.str("AUTHBROKER_URL")
-    AUTHBROKER_CLIENT_ID = env.str("AUTHBROKER_CLIENT_ID")
-    AUTHBROKER_CLIENT_SECRET = env.str("AUTHBROKER_CLIENT_SECRET")
-    LOGIN_URL = reverse_lazy("authbroker_client:login")
-    LOGIN_REDIRECT_URL = reverse_lazy("homepage")
-elif LOGIN_METHOD == "magic_link":
+OIDC_CLAIM_MAPPING = {
+    'email': 'email',
+    'name': 'name',
+    'redbox_admin': 'redbox_admin',
+}
+
+if ENVIRONMENT.is_local:
+    SITE_DOMAIN = f"http://{ENVIRONMENT.hosts[0]}:8090"
+else:
+    SITE_DOMAIN = f"https://{ENVIRONMENT.hosts[0]}"
+
+OKTA_DOMAIN = env.str("OKTA_DOMAIN")
+OIDC_OP_ISSUER = f'https://{OKTA_DOMAIN}/oauth2/default'
+OIDC_RP_CALLBACK_URL = f'{SITE_DOMAIN}/oidc/callback/'
+OIDC_RP_USE_PKCE = True
+OIDC_PKCE_CODE_CHALLENGE_METHOD = 'S256'
+
+if ENVIRONMENT.is_local:
+    OIDC_RP_CLIENT_ID = env.str("OIDC_RP_CLIENT_ID_LOCAL")
+    OIDC_RP_CLIENT_SECRET = env.str("OIDC_RP_CLIENT_SECRET_LOCAL")
+elif ENVIRONMENT.is_dev:
+    OIDC_RP_CLIENT_ID = env.str("OIDC_RP_CLIENT_ID_DEV")
+    OIDC_RP_CLIENT_SECRET = env.str("OIDC_RP_CLIENT_SECRET_DEV")
+elif ENVIRONMENT.is_preprod:
+    OIDC_RP_CLIENT_ID = env.str("OIDC_RP_CLIENT_ID_PREPROD")
+    OIDC_RP_CLIENT_SECRET = env.str("OIDC_RP_CLIENT_SECRET_PREPROD")
+elif ENVIRONMENT.is_prod:
+    OIDC_RP_CLIENT_ID = env.str("OIDC_RP_CLIENT_ID_PROD")
+    OIDC_RP_CLIENT_SECRET = env.str("OIDC_RP_CLIENT_SECRET_PROD")
+
+OIDC_OP_AUTHORIZATION_ENDPOINT = f'https://{OKTA_DOMAIN}/oauth2/default/v1/authorize'
+OIDC_OP_TOKEN_ENDPOINT = f'https://{OKTA_DOMAIN}/oauth2/default/v1/token'
+OIDC_OP_USER_ENDPOINT = f'https://{OKTA_DOMAIN}/oauth2/default/v1/userinfo'
+OIDC_OP_JWKS_ENDPOINT = f'https://{OKTA_DOMAIN}/oauth2/default/v1/keys'
+OIDC_RP_SIGN_ALGO = 'RS256'
+LOGOUT_REDIRECT_URL = f'{SITE_DOMAIN}'
+LOGIN_URL = '/oidc/authenticate/'
+
+##if LOGIN_METHOD == "sso":
+##    AUTHBROKER_URL = env.str("AUTHBROKER_URL")
+##    AUTHBROKER_CLIENT_ID = env.str("AUTHBROKER_CLIENT_ID")
+##    AUTHBROKER_CLIENT_SECRET = env.str("AUTHBROKER_CLIENT_SECRET")
+##    LOGIN_URL = reverse_lazy("authbroker_client:login")
+##    LOGIN_REDIRECT_URL = reverse_lazy("homepage")
+if LOGIN_METHOD == "magic_link":
     SESSION_COOKIE_SAMESITE = "Strict"
     LOGIN_REDIRECT_URL = "homepage"
     LOGIN_URL = "sign-in"
@@ -234,7 +271,7 @@ CSRF_COOKIE_HTTPONLY = True
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_AGE = 60 * 60 * 24
-SESSION_COOKIE_SAMESITE = "Strict"
+SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
 
 LOG_ROOT = "."
@@ -265,6 +302,9 @@ if ENVIRONMENT.uses_minio:
     MINIO_PORT = env.str("MINIO_PORT")
     MINIO_ENDPOINT = f"http://{MINIO_HOST}:{MINIO_PORT}"
     AWS_S3_ENDPOINT_URL = MINIO_ENDPOINT
+    SESSION_COOKIE_SECURE = False
+    SECURE_HSTS_SECONDS = 0  # Disable HSTS in development
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = False
 else:
     # https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security
     # Mozilla guidance max-age 2 years

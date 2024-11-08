@@ -417,6 +417,7 @@ class User(BaseUser, UUIDPrimaryKeyBase):
         MORE_THAN_2_DAYS = "More than 2 days", _("More than 2 days")
         MORE_THAN_1_WEEK = "More than a week", _("More than a week")
 
+    USERNAME_FIELD = 'email'
     username = None
     verified = models.BooleanField(default=False, blank=True, null=True)
     invited_at = models.DateTimeField(default=None, blank=True, null=True)

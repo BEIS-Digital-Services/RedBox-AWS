@@ -6,6 +6,7 @@ authors = ["i.AI <i-dot-ai-enquiries@cabinetoffice.gov.uk>"]
 license = "MIT"
 
 [tool.poetry.dependencies]
+PyJWT = "2.9.0"
 python = ">=3.12,<3.13"
 redbox = {path="../redbox-core", develop=true}
 django = "^5.1"
@@ -44,6 +45,7 @@ django-adminplus = "^0.6"
 pandas = "^2.2.2"
 django-waffle = "^4.1.0"
 opensearch-py = "^2.7.1"
+mozilla-django-oidc = "^4.0.1" 
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.2"

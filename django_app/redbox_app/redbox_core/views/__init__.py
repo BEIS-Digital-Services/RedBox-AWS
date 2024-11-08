@@ -1,5 +1,5 @@
 from redbox_app.redbox_core.dash_apps import report_app
-from redbox_app.redbox_core.views.auth_views import sign_in_link_sent_view, sign_in_view, signed_out_view
+from redbox_app.redbox_core.views.auth_views import (oidc_callback, oidc_logout_view, sign_in_view)
 from redbox_app.redbox_core.views.chat_views import ChatsTitleView, ChatsView, DeleteChat, UpdateChatFeedback
 from redbox_app.redbox_core.views.citation_views import CitationsView
 from redbox_app.redbox_core.views.demographics_views import (
@@ -7,6 +7,10 @@ from redbox_app.redbox_core.views.demographics_views import (
     DemographicsView,
     UpdateDemographicsView,
 )
+
+from redbox_app.redbox_core.views.custom_oidc_views import \
+    CustomOIDCAuthenticationRequestView
+
 from redbox_app.redbox_core.views.document_views import (
     DocumentView,
     UploadView,
@@ -36,9 +40,6 @@ __all__ = [
     "privacy_notice_view",
     "accessibility_statement_view",
     "support_view",
-    "sign_in_view",
-    "sign_in_link_sent_view",
-    "signed_out_view",
     "Signup1",
     "Signup2",
     "Signup3",
@@ -49,4 +50,8 @@ __all__ = [
     "report_app",
     "UpdateChatFeedback",
     "DeleteChat",
+    "CustomOIDCAuthenticationRequestView",
+    "oidc_callback",
+    "oidc_logout_view",
+    "sign_in_view"
 ]
