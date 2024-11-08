@@ -56,7 +56,6 @@ class CustomOIDCAuthenticationBackend(OIDCAuthenticationBackend):
                 issuer=settings.OIDC_OP_ISSUER,
                 options={"verify_exp": True}
             )
-            logger.info(f"Decoded claims from id_token: {claims}")  # Log the claims
             return claims
         except jwt.PyJWTError as e:
             logger.error(f"Failed to decode ID token: {e}")
@@ -115,8 +114,6 @@ class CustomOIDCAuthenticationBackend(OIDCAuthenticationBackend):
 
         # Exchange the authorization code for tokens
         token_data = self.exchange_code_for_token(code, code_verifier)
-
-        logger.info(f"Token data received: {token_data}") #REMOVE
 
         if not token_data or 'id_token' not in token_data:
             logger.error("No id_token found in token response.")
