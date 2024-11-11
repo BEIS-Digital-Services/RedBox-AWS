@@ -33,9 +33,10 @@ class Environment(StrEnum):
     def uses_minio(self) -> bool:
         return self.is_test
 
-    LOCAL = ("LOCAL", True, [*LOCAL_HOSTS, *ADDITIONAL_HOSTS])  # nosec: B104: Not in prod
+    LOCAL = ("LOCAL", True, [*LOCAL_HOSTS, *ADDITIONAL_HOSTS])
+    DEV = ("DEV", True, [*LOCAL_HOSTS, *ADDITIONAL_HOSTS])  # nosec: B104: Not in prod
     INTEGRATION = ("INTEGRATION", True, [*LOCAL_HOSTS, *ADDITIONAL_HOSTS])  # nosec: B104: Not in prod
-    DEV = ("DEV", False, ["dev.redbox.dsit.gov.uk", *ADDITIONAL_HOSTS])
+    #DEV = ("DEV", False, ["dev.redbox.dsit.gov.uk", *ADDITIONAL_HOSTS])
     PREPROD = ("PREPROD", False, ["staging.redbox.dsit.gov.uk", *ADDITIONAL_HOSTS])
     PROD = ("PROD", False, ["redbox.dsit.gov.uk", *ADDITIONAL_HOSTS])
 

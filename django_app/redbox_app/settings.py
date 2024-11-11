@@ -165,10 +165,12 @@ OIDC_CLAIM_MAPPING = {
     'redbox_admin': 'redbox_admin',
 }
 
-if ENVIRONMENT.is_local:
-    SITE_DOMAIN = f"http://{ENVIRONMENT.hosts[0]}:8090"
-else:
-    SITE_DOMAIN = f"https://{ENVIRONMENT.hosts[0]}"
+#if ENVIRONMENT.is_local:
+#    SITE_DOMAIN = f"http://{ENVIRONMENT.hosts[0]}:8090"
+#else:
+#    SITE_DOMAIN = f"https://{ENVIRONMENT.hosts[0]}"
+
+SITE_DOMAIN = f"http://{ENVIRONMENT.hosts[0]}:8090"
 
 if ENVIRONMENT.is_prod:
     OKTA_DOMAIN = env.str("OKTA_DOMAIN_PROD")
@@ -313,8 +315,8 @@ else:
     # https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security
     # Mozilla guidance max-age 2 years
     SECURE_HSTS_SECONDS = 2 * 365 * 24 * 60 * 60
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SESSION_COOKIE_SECURE = True
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+    SESSION_COOKIE_SECURE = False
 
 if ENVIRONMENT.is_test:
     ALLOWED_HOSTS = ENVIRONMENT.hosts

@@ -142,17 +142,27 @@ class Settings(BaseSettings):
     @lru_cache(1)
     def elasticsearch_client(self) -> Union[Elasticsearch, OpenSearch]:
         logger.info("Testing OpenSearch is definitely being used")
-        if ENVIRONMENT.is_local:
-            auth = ("admin", "MyStrongPassword1!")
-            use_ssl = False
-            verify_certs = False
-            port = 9200
-        else:
-            credentials = boto3.Session().get_credentials()
-            auth = AWSV4SignerAuth(credentials, "eu-west-2")
-            use_ssl = True
-            verify_certs = True
-            port = 443
+        #if ENVIRONMENT.is_local:
+        #    auth = ("admin", "MyStrongPassword1!")
+        #    use_ssl = False
+        #    verify_certs = False
+        #    port = 9200
+        #else:
+
+        #credentials = boto3.Session().get_credentials()
+        #auth = AWSV4SignerAuth(credentials, "eu-west-2")
+        # Hardcode credentials and create a session
+        session = boto3.Session(
+            aws_access_key_id="",
+            aws_secret_access_key="",
+            region_name="eu-west-2"  # Your AWS region
+        )
+
+        auth = AWSV4SignerAuth(session.get_credentials(), session.region_name)
+
+        use_ssl = True
+        verify_certs = True
+        port = 443
         client = OpenSearch(
             hosts=[{"host": env.str("ELASTIC__COLLECTION_ENPDOINT"), "port": port}],
             http_auth=auth,
