@@ -4,10 +4,16 @@ from uuid import NAMESPACE_DNS, UUID, uuid5
 import tiktoken
 from langchain_core.callbacks.manager import dispatch_custom_event
 from langchain_core.documents import Document
-from langchain_core.messages import ToolCall
+from langchain_core.messages import ToolCall, AnyMessage
 from langchain_core.runnables import RunnableLambda
 
-from redbox.models.chain import DocumentState, LLMCallMetadata, RedboxState, RequestMetadata, ToolState
+from redbox.models.chain import (
+    DocumentState,
+    LLMCallMetadata,
+    RedboxState,
+    RequestMetadata,
+    ToolState,
+)
 from redbox.models.graph import RedboxEventType
 
 
@@ -51,13 +57,13 @@ def structure_documents_by_file_name(docs: list[Document]) -> DocumentState:
     # Group file_name to UUID lookup
     group_file_lookup = {}
     for d in docs:
-        file_name = d.metadata["file_name"]
+        file_name = d.metadata["uri"]
         if file_name not in group_file_lookup:
             group_file_lookup[file_name] = uuid5(NAMESPACE_DNS, file_name)
 
     # Group documents by their file_name's UUID
     for d in docs:
-        group_uuid = group_file_lookup.get(d.metadata["file_name"])
+        group_uuid = group_file_lookup.get(d.metadata["uri"])
         doc_dict = {d.metadata["uuid"]: d}
 
         result[group_uuid] = (result.get(group_uuid) or doc_dict) | doc_dict
@@ -87,7 +93,7 @@ def structure_documents_by_group_and_indices(docs: list[Document]) -> DocumentSt
     current_filename: str | None = None
 
     for d in docs:
-        is_not_same_filename = d.metadata["file_name"] != current_filename
+        is_not_same_filename = d.metadata["uri"] != current_filename
         is_not_none_filename = current_filename is not None
         is_not_consecutive = d.metadata["index"] - 1 != (
             current_group_indices[-1] if current_group_indices else d.metadata["index"]
@@ -102,7 +108,7 @@ def structure_documents_by_group_and_indices(docs: list[Document]) -> DocumentSt
 
         current_group[d.metadata["uuid"]] = d
         current_group_indices.append(d.metadata["index"])
-        current_filename = d.metadata["file_name"]
+        current_filename = d.metadata["uri"]
 
     # Handle the last group
     if current_group:
@@ -124,21 +130,23 @@ def get_document_token_count(state: RedboxState) -> int:
     return sum(d.metadata["token_count"] for d in flatten_document_state(state.get("documents", [])))
 
 
-@RunnableLambda
-def to_request_metadata(prompt_response_model: dict):
+def to_request_metadata(obj: dict):
     """Takes a dictionary with keys 'prompt', 'response' and 'model' and creates metadata.
 
     Will also emit events for metadata updates.
     """
-    model = prompt_response_model["model"]
+
+    prompt = obj["prompt"]
+    response = obj["text_and_tools"]["raw_response"].content
+    model = obj["model"]
 
     try:
         tokeniser = tiktoken.encoding_for_model(model)
     except KeyError:
         tokeniser = tiktoken.get_encoding("cl100k_base")
 
-    input_tokens = len(tokeniser.encode(prompt_response_model["prompt"]))
-    output_tokens = len(tokeniser.encode(prompt_response_model["response"]))
+    input_tokens = len(tokeniser.encode(prompt))
+    output_tokens = len(tokeniser.encode(response))
 
     metadata_event = RequestMetadata(
         llm_calls=[LLMCallMetadata(llm_model_name=model, input_tokens=input_tokens, output_tokens=output_tokens)]
@@ -147,6 +155,26 @@ def to_request_metadata(prompt_response_model: dict):
     dispatch_custom_event(RedboxEventType.on_metadata_generation.value, metadata_event)
 
     return metadata_event
+
+
+@RunnableLambda
+def get_all_metadata(obj: dict):
+    text_and_tools = obj["text_and_tools"]
+
+    if parsed_response := text_and_tools.get("parsed_response"):
+        text = getattr(parsed_response, "answer", parsed_response)
+        citations = getattr(parsed_response, "citations", [])
+    else:
+        text = text_and_tools["raw_response"].content
+        citations = []
+
+    out = {
+        "tool_calls": text_and_tools["tool_calls"],
+        "metadata": to_request_metadata(obj),
+        "text": text,
+        "citations": citations,
+    }
+    return out
 
 
 def merge_documents(initial: list[Document], adjacent: list[Document]) -> list[Document]:
@@ -192,7 +220,7 @@ def sort_documents(documents: list[Document]) -> list[Document]:
     def is_consecutive(a: Document, b: Document) -> bool:
         """True if two documents have consecutive indices."""
         within_one = abs(a.metadata["index"] - b.metadata["index"]) <= 1
-        return a.metadata["file_name"] == b.metadata["file_name"] and within_one
+        return a.metadata["uri"] == b.metadata["uri"] and within_one
 
     def max_score(group: list[Document]) -> float:
         """Returns the maximum score in a group of documents."""
@@ -224,10 +252,10 @@ def sort_documents(documents: list[Document]) -> list[Document]:
         return sorted_blocks
 
     # Step 1: Sort by file_name and then index to prepare for grouping consecutive documents
-    documents_sorted = sorted(documents, key=lambda d: (d.metadata["file_name"], d.metadata["index"]))
+    documents_sorted = sorted(documents, key=lambda d: (d.metadata["uri"], d.metadata["index"]))
 
     # Step 2: Group by file_name and handle consecutive indices
-    grouped_by_file = itertools.groupby(documents_sorted, key=lambda d: d.metadata["file_name"])
+    grouped_by_file = itertools.groupby(documents_sorted, key=lambda d: d.metadata["uri"])
 
     # Process each group
     all_sorted_blocks = []
@@ -243,9 +271,9 @@ def sort_documents(documents: list[Document]) -> list[Document]:
     return list(itertools.chain.from_iterable(all_sorted_blocks_by_max_score))
 
 
-def tool_calls_to_toolstate(tool_calls: list[ToolCall], called: bool | None = False) -> ToolState:
+def tool_calls_to_toolstate(message: AnyMessage, called: bool | None = False) -> ToolState:
     """Takes a list of tool calls and shapes them into a valid ToolState.
 
     Sets all tool calls to a called state. Assumes this state is False.
     """
-    return {t["id"]: {"tool": ToolCall(**t), "called": called} for t in tool_calls}
+    return ToolState({t["id"]: {"tool": ToolCall(**t), "called": called} for t in message.tool_calls})
