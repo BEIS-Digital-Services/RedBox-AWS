@@ -10,7 +10,6 @@ from openai import max_retries
 from opensearchpy import AWSV4SignerAuth, OpenSearch, RequestsHttpConnection
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from redbox.models.chain import ChatLLMBackend
 from redbox_app.setting_enums import Environment
 from langchain.globals import set_debug
 
