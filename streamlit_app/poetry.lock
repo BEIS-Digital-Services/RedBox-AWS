@@ -210,6 +210,27 @@ tests = ["cloudpickle", "hypothesis", "mypy (>=1.11.1)", "pympler", "pytest (>=4
 tests-mypy = ["mypy (>=1.11.1)", "pytest-mypy-plugins"]
 
 [[package]]
+name = "beautifulsoup4"
+version = "4.12.3"
+description = "Screen-scraping library"
+optional = false
+python-versions = ">=3.6.0"
+files = [
+    {file = "beautifulsoup4-4.12.3-py3-none-any.whl", hash = "sha256:b80878c9f40111313e55da8ba20bdba06d8fa3969fc68304167741bbf9e082ed"},
+    {file = "beautifulsoup4-4.12.3.tar.gz", hash = "sha256:74e3d1928edc070d21748185c46e3fb33490f22f52a3addee9aee0f4f7781051"},
+]
+
+[package.dependencies]
+soupsieve = ">1.2"
+
+[package.extras]
+cchardet = ["cchardet"]
+chardet = ["chardet"]
+charset-normalizer = ["charset-normalizer"]
+html5lib = ["html5lib"]
+lxml = ["lxml"]
+
+[[package]]
 name = "blinker"
 version = "1.8.2"
 description = "Fast, simple object-to-object and broadcast signaling"
@@ -420,6 +441,19 @@ files = [
 ]
 
 [[package]]
+name = "construct"
+version = "2.5.3"
+description = "A powerful declarative parser/builder for binary data"
+optional = false
+python-versions = "*"
+files = [
+    {file = "construct-2.5.3.tar.gz", hash = "sha256:b2233bc7c6a4d73803f5806bc3167e4935daa3ea8a5cd056cbabbdb9c3d79a36"},
+]
+
+[package.dependencies]
+six = "*"
+
+[[package]]
 name = "dataclasses-json"
 version = "0.6.7"
 description = "Easily serialize dataclasses to and from JSON."
@@ -487,6 +521,16 @@ orjson = ["orjson (>=3)"]
 pyarrow = ["pyarrow (>=1)"]
 requests = ["requests (>=2.4.0,!=2.32.2,<3.0.0)"]
 vectorstore-mmr = ["numpy (>=1)", "simsimd (>=3)"]
+
+[[package]]
+name = "events"
+version = "0.5"
+description = "Bringing the elegance of C# EventHandler to Python"
+optional = false
+python-versions = "*"
+files = [
+    {file = "Events-0.5-py3-none-any.whl", hash = "sha256:a7286af378ba3e46640ac9825156c93bdba7502174dd696090fdfcd4d80a1abd"},
+]
 
 [[package]]
 name = "frozenlist"
@@ -704,6 +748,22 @@ files = [
 ]
 
 [[package]]
+name = "haystack"
+version = "0.42"
+description = "Search C Structures in a process' memory"
+optional = false
+python-versions = "*"
+files = [
+    {file = "haystack-0.42-py2.py3-none-any.whl", hash = "sha256:3d1a906ddca6a08c6e5f965026cc1978f09795c65d5ab2c84b3c039378a9bec8"},
+    {file = "haystack-0.42.tar.gz", hash = "sha256:4eaf0ba481d160639e240602734a9195f3dfc37c6c0ad132a14e9eb1454868f0"},
+]
+
+[package.dependencies]
+construct = "<2.8"
+pefile = "*"
+python-ptrace = ">=0.8.1"
+
+[[package]]
 name = "httpcore"
 version = "1.0.6"
 description = "A minimal low-level HTTP client."
@@ -748,6 +808,17 @@ cli = ["click (==8.*)", "pygments (==2.*)", "rich (>=10,<14)"]
 http2 = ["h2 (>=3,<5)"]
 socks = ["socksio (==1.*)"]
 zstd = ["zstandard (>=0.18.0)"]
+
+[[package]]
+name = "httpx-sse"
+version = "0.4.0"
+description = "Consume Server-Sent Event (SSE) messages with HTTPX."
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "httpx-sse-0.4.0.tar.gz", hash = "sha256:1e81a3a3070ce322add1d3529ed42eb5f70817f45ed6ec915ab753f961139721"},
+    {file = "httpx_sse-0.4.0-py3-none-any.whl", hash = "sha256:f329af6eae57eaa2bdfd962b42524764af68075ea87370a2de920af5341e318f"},
+]
 
 [[package]]
 name = "idna"
@@ -965,61 +1036,63 @@ testing = ["matplotlib (>=2.2.5)", "pytest (>=5.0.1)", "pytest-cov (>=3.0.0)"]
 
 [[package]]
 name = "langchain"
-version = "0.2.16"
+version = "0.3.7"
 description = "Building applications with LLMs through composability"
 optional = false
-python-versions = "<4.0,>=3.8.1"
+python-versions = "<4.0,>=3.9"
 files = [
-    {file = "langchain-0.2.16-py3-none-any.whl", hash = "sha256:8f59ee8b45f268df4b924ea3b9c63e49286efa756d16b3f6a9de5c6e502c36e1"},
-    {file = "langchain-0.2.16.tar.gz", hash = "sha256:ffb426a76a703b73ac69abad77cd16eaf03dda76b42cff55572f592d74944166"},
+    {file = "langchain-0.3.7-py3-none-any.whl", hash = "sha256:cf4af1d5751dacdc278df3de1ff3cbbd8ca7eb55d39deadccdd7fb3d3ee02ac0"},
+    {file = "langchain-0.3.7.tar.gz", hash = "sha256:2e4f83bf794ba38562f7ba0ede8171d7e28a583c0cec6f8595cfe72147d336b2"},
 ]
 
 [package.dependencies]
 aiohttp = ">=3.8.3,<4.0.0"
-langchain-core = ">=0.2.38,<0.3.0"
-langchain-text-splitters = ">=0.2.0,<0.3.0"
+langchain-core = ">=0.3.15,<0.4.0"
+langchain-text-splitters = ">=0.3.0,<0.4.0"
 langsmith = ">=0.1.17,<0.2.0"
 numpy = {version = ">=1.26.0,<2.0.0", markers = "python_version >= \"3.12\""}
-pydantic = ">=1,<3"
+pydantic = ">=2.7.4,<3.0.0"
 PyYAML = ">=5.3"
 requests = ">=2,<3"
 SQLAlchemy = ">=1.4,<3"
-tenacity = ">=8.1.0,<8.4.0 || >8.4.0,<9.0.0"
+tenacity = ">=8.1.0,<8.4.0 || >8.4.0,<10"
 
 [[package]]
 name = "langchain-aws"
-version = "0.1.18"
+version = "0.2.7"
 description = "An integration package connecting AWS and LangChain"
 optional = false
-python-versions = "<4.0,>=3.8.1"
+python-versions = "<4.0,>=3.9"
 files = [
-    {file = "langchain_aws-0.1.18-py3-none-any.whl", hash = "sha256:54c65157c67837cd932a6a8c536b52e2308c4e917bccd187d6f42651943cdd51"},
-    {file = "langchain_aws-0.1.18.tar.gz", hash = "sha256:2e59efc95ef6758581b7e769cd610b750c76635c437a4f43c454a14cfab67c64"},
+    {file = "langchain_aws-0.2.7-py3-none-any.whl", hash = "sha256:f60f5e76ce9b3c175d569d40a7a8e113d3aa9feb8e88d013e6054da36501afef"},
+    {file = "langchain_aws-0.2.7.tar.gz", hash = "sha256:5abf12d7cad5164363008612f906bf27cb85b8f82befe71dbdf27afeda4548eb"},
 ]
 
 [package.dependencies]
-boto3 = ">=1.34.131,<1.35.0"
-langchain-core = ">=0.2.33,<0.3"
+boto3 = ">=1.34.131"
+langchain-core = ">=0.3.15,<0.4"
 numpy = {version = ">=1.26.0,<2.0.0", markers = "python_version >= \"3.12\""}
+pydantic = ">=2,<3"
 
 [[package]]
 name = "langchain-community"
-version = "0.2.17"
+version = "0.3.0"
 description = "Community contributed LangChain integrations."
 optional = false
-python-versions = "<4.0,>=3.8.1"
+python-versions = "<4.0,>=3.9"
 files = [
-    {file = "langchain_community-0.2.17-py3-none-any.whl", hash = "sha256:d07c31b641e425fb8c3e7148ad6a62e1b54a9adac6e1173021a7dd3148266063"},
-    {file = "langchain_community-0.2.17.tar.gz", hash = "sha256:b0745c1fcf1bd532ed4388f90b47139d6a6c6ba48a87aa68aa32d4d6bb97259d"},
+    {file = "langchain_community-0.3.0-py3-none-any.whl", hash = "sha256:40084f1f785f0fb56c8698ff059bbda8bd8c683cbdffa7902a0e04e72961496c"},
+    {file = "langchain_community-0.3.0.tar.gz", hash = "sha256:1ee8a469ad66977f21b9d96bdcdd8549c5281c474f0f9cc13b932efd63a78105"},
 ]
 
 [package.dependencies]
 aiohttp = ">=3.8.3,<4.0.0"
 dataclasses-json = ">=0.5.7,<0.7"
-langchain = ">=0.2.16,<0.3.0"
-langchain-core = ">=0.2.39,<0.3.0"
+langchain = ">=0.3.0,<0.4.0"
+langchain-core = ">=0.3.0,<0.4.0"
 langsmith = ">=0.1.112,<0.2.0"
 numpy = {version = ">=1.26.0,<2.0.0", markers = "python_version >= \"3.12\""}
+pydantic-settings = ">=2.4.0,<3.0.0"
 PyYAML = ">=5.3"
 requests = ">=2,<3"
 SQLAlchemy = ">=1.4,<3"
@@ -1027,86 +1100,87 @@ tenacity = ">=8.1.0,<8.4.0 || >8.4.0,<9.0.0"
 
 [[package]]
 name = "langchain-core"
-version = "0.2.41"
+version = "0.3.15"
 description = "Building applications with LLMs through composability"
 optional = false
-python-versions = "<4.0,>=3.8.1"
+python-versions = "<4.0,>=3.9"
 files = [
-    {file = "langchain_core-0.2.41-py3-none-any.whl", hash = "sha256:3278fda5ba9a05defae8bb19f1226032add6aab21917db7b3bc74e750e263e84"},
-    {file = "langchain_core-0.2.41.tar.gz", hash = "sha256:bc12032c5a298d85be754ccb129bc13ea21ccb1d6e22f8d7ba18b8da64315bb5"},
+    {file = "langchain_core-0.3.15-py3-none-any.whl", hash = "sha256:3d4ca6dbb8ed396a6ee061063832a2451b0ce8c345570f7b086ffa7288e4fa29"},
+    {file = "langchain_core-0.3.15.tar.gz", hash = "sha256:b1a29787a4ffb7ec2103b4e97d435287201da7809b369740dd1e32f176325aba"},
 ]
 
 [package.dependencies]
 jsonpatch = ">=1.33,<2.0"
-langsmith = ">=0.1.112,<0.2.0"
+langsmith = ">=0.1.125,<0.2.0"
 packaging = ">=23.2,<25"
 pydantic = [
-    {version = ">=1,<3", markers = "python_full_version < \"3.12.4\""},
+    {version = ">=2.5.2,<3.0.0", markers = "python_full_version < \"3.12.4\""},
     {version = ">=2.7.4,<3.0.0", markers = "python_full_version >= \"3.12.4\""},
 ]
 PyYAML = ">=5.3"
-tenacity = ">=8.1.0,<8.4.0 || >8.4.0,<9.0.0"
+tenacity = ">=8.1.0,<8.4.0 || >8.4.0,<10.0.0"
 typing-extensions = ">=4.7"
 
 [[package]]
 name = "langchain-elasticsearch"
-version = "0.2.2"
+version = "0.3.0"
 description = "An integration package connecting Elasticsearch and LangChain"
 optional = false
-python-versions = "<4.0,>=3.8.1"
+python-versions = "<4.0,>=3.9"
 files = [
-    {file = "langchain_elasticsearch-0.2.2-py3-none-any.whl", hash = "sha256:2b0ae1637afc6890c371fc67be2151954db3c7f5382a07dafe4cf3bd762c6f26"},
-    {file = "langchain_elasticsearch-0.2.2.tar.gz", hash = "sha256:7abe1cdee9f3b1a5f4152d2f79514359d0b95dc6d3923d3adb4ac431be854545"},
+    {file = "langchain_elasticsearch-0.3.0-py3-none-any.whl", hash = "sha256:83d26d2a29f7628bcf2c655fe988930c90249e78e6f326c0be218ad4fa96f1f4"},
+    {file = "langchain_elasticsearch-0.3.0.tar.gz", hash = "sha256:36c2963c432777e05b6613f57ee477de4b6e4be4ac4c1306601ab64de004a297"},
 ]
 
 [package.dependencies]
 elasticsearch = {version = ">=8.13.1,<9.0.0", extras = ["vectorstore-mmr"]}
-langchain-core = ">=0.1.50,<0.3"
+langchain-core = ">=0.3.0,<0.4.0"
 
 [[package]]
 name = "langchain-openai"
-version = "0.1.25"
+version = "0.2.6"
 description = "An integration package connecting OpenAI and LangChain"
 optional = false
-python-versions = "<4.0,>=3.8.1"
+python-versions = "<4.0,>=3.9"
 files = [
-    {file = "langchain_openai-0.1.25-py3-none-any.whl", hash = "sha256:f0b34a233d0d9cb8fce6006c903e57085c493c4f0e32862b99063b96eaedb109"},
-    {file = "langchain_openai-0.1.25.tar.gz", hash = "sha256:eb116f744f820247a72f54313fb7c01524fba0927120d4e899e5e4ab41ad3928"},
+    {file = "langchain_openai-0.2.6-py3-none-any.whl", hash = "sha256:d56e4d9183bdd1a5fb5f3ed9d287f15108e01d631ded170dd330a566f2927b95"},
+    {file = "langchain_openai-0.2.6.tar.gz", hash = "sha256:7054e5f64498ad8e59d77cdc210103f5ea4f67258997edc48ae237298adeb316"},
 ]
 
 [package.dependencies]
-langchain-core = ">=0.2.40,<0.3.0"
-openai = ">=1.40.0,<2.0.0"
+langchain-core = ">=0.3.15,<0.4.0"
+openai = ">=1.54.0,<2.0.0"
 tiktoken = ">=0.7,<1"
 
 [[package]]
 name = "langchain-text-splitters"
-version = "0.2.4"
+version = "0.3.2"
 description = "LangChain text splitting utilities"
 optional = false
-python-versions = "<4.0,>=3.8.1"
+python-versions = "<4.0,>=3.9"
 files = [
-    {file = "langchain_text_splitters-0.2.4-py3-none-any.whl", hash = "sha256:2702dee5b7cbdd595ccbe43b8d38d01a34aa8583f4d6a5a68ad2305ae3e7b645"},
-    {file = "langchain_text_splitters-0.2.4.tar.gz", hash = "sha256:f7daa7a3b0aa8309ce248e2e2b6fc8115be01118d336c7f7f7dfacda0e89bf29"},
+    {file = "langchain_text_splitters-0.3.2-py3-none-any.whl", hash = "sha256:0db28c53f41d1bc024cdb3b1646741f6d46d5371e90f31e7e7c9fbe75d01c726"},
+    {file = "langchain_text_splitters-0.3.2.tar.gz", hash = "sha256:81e6515d9901d6dd8e35fb31ccd4f30f76d44b771890c789dc835ef9f16204df"},
 ]
 
 [package.dependencies]
-langchain-core = ">=0.2.38,<0.3.0"
+langchain-core = ">=0.3.15,<0.4.0"
 
 [[package]]
 name = "langgraph"
-version = "0.2.35"
+version = "0.2.45"
 description = "Building stateful, multi-actor applications with LLMs"
 optional = false
 python-versions = "<4.0,>=3.9.0"
 files = [
-    {file = "langgraph-0.2.35-py3-none-any.whl", hash = "sha256:e9dfa85f05bee25b732f7e9ee26f8fc127e937d531762042c83d6c13f39898a3"},
-    {file = "langgraph-0.2.35.tar.gz", hash = "sha256:707752f99c887570a797373584c7412f8c1d23dc6980b3e43e3341aa6122aca9"},
+    {file = "langgraph-0.2.45-py3-none-any.whl", hash = "sha256:adfa9545c6c27180e995b654cb5817212c134a98407c7f34253a5fae58893f28"},
+    {file = "langgraph-0.2.45.tar.gz", hash = "sha256:939035e830506c5b662c9e61d95dbd1a5ef9d1fd35310dba68cebb33de2e7cdb"},
 ]
 
 [package.dependencies]
-langchain-core = ">=0.2.39,<0.4"
+langchain-core = ">=0.2.43,<0.3.0 || >0.3.0,<0.3.1 || >0.3.1,<0.3.2 || >0.3.2,<0.3.3 || >0.3.3,<0.3.4 || >0.3.4,<0.3.5 || >0.3.5,<0.3.6 || >0.3.6,<0.3.7 || >0.3.7,<0.3.8 || >0.3.8,<0.3.9 || >0.3.9,<0.3.10 || >0.3.10,<0.3.11 || >0.3.11,<0.3.12 || >0.3.12,<0.3.13 || >0.3.13,<0.3.14 || >0.3.14,<0.4.0"
 langgraph-checkpoint = ">=2.0.0,<3.0.0"
+langgraph-sdk = ">=0.1.32,<0.2.0"
 
 [[package]]
 name = "langgraph-checkpoint"
@@ -1122,6 +1196,22 @@ files = [
 [package.dependencies]
 langchain-core = ">=0.2.38,<0.4"
 msgpack = ">=1.1.0,<2.0.0"
+
+[[package]]
+name = "langgraph-sdk"
+version = "0.1.35"
+description = "SDK for interacting with LangGraph API"
+optional = false
+python-versions = "<4.0.0,>=3.9.0"
+files = [
+    {file = "langgraph_sdk-0.1.35-py3-none-any.whl", hash = "sha256:b137c324fbce96afe39cc6a189c61fc042164068f0f6f02ac8de864d8ece6e05"},
+    {file = "langgraph_sdk-0.1.35.tar.gz", hash = "sha256:414cfbc172b883446197763f3645d86bbc6a5b8ce9693c1df3fb6ce7d854a994"},
+]
+
+[package.dependencies]
+httpx = ">=0.25.2"
+httpx-sse = ">=0.4.0"
+orjson = ">=3.10.1"
 
 [[package]]
 name = "langsmith"
@@ -1519,13 +1609,13 @@ files = [
 
 [[package]]
 name = "openai"
-version = "1.51.2"
+version = "1.54.3"
 description = "The official Python library for the openai API"
 optional = false
-python-versions = ">=3.7.1"
+python-versions = ">=3.8"
 files = [
-    {file = "openai-1.51.2-py3-none-any.whl", hash = "sha256:5c5954711cba931423e471c37ff22ae0fd3892be9b083eee36459865fbbb83fa"},
-    {file = "openai-1.51.2.tar.gz", hash = "sha256:c6a51fac62a1ca9df85a522e462918f6bb6bc51a8897032217e453a0730123a6"},
+    {file = "openai-1.54.3-py3-none-any.whl", hash = "sha256:f18dbaf09c50d70c4185b892a2a553f80681d1d866323a2da7f7be2f688615d5"},
+    {file = "openai-1.54.3.tar.gz", hash = "sha256:7511b74eeb894ac0b0253dc71f087a15d2e4d71d22d0088767205143d880cca6"},
 ]
 
 [package.dependencies]
@@ -1540,6 +1630,30 @@ typing-extensions = ">=4.11,<5"
 
 [package.extras]
 datalib = ["numpy (>=1)", "pandas (>=1.2.3)", "pandas-stubs (>=1.1.0.11)"]
+
+[[package]]
+name = "opensearch-py"
+version = "2.7.1"
+description = "Python client for OpenSearch"
+optional = false
+python-versions = "<4,>=3.8"
+files = [
+    {file = "opensearch_py-2.7.1-py3-none-any.whl", hash = "sha256:5417650eba98a1c7648e502207cebf3a12beab623ffe0ebbf55f9b1b4b6e44e9"},
+    {file = "opensearch_py-2.7.1.tar.gz", hash = "sha256:67ab76e9373669bc71da417096df59827c08369ac3795d5438c9a8be21cbd759"},
+]
+
+[package.dependencies]
+certifi = ">=2024.07.04"
+Events = "*"
+python-dateutil = "*"
+requests = ">=2.32.0,<3.0.0"
+urllib3 = {version = ">=1.26.19,<2.2.0 || >2.2.0,<2.2.1 || >2.2.1,<3", markers = "python_version >= \"3.10\""}
+
+[package.extras]
+async = ["aiohttp (>=3.9.4,<4)"]
+develop = ["black (>=24.3.0)", "botocore", "coverage (<8.0.0)", "jinja2", "myst-parser", "pytest (>=3.0.0)", "pytest-cov", "pytest-mock (<4.0.0)", "pytz", "pyyaml", "requests (>=2.0.0,<3.0.0)", "sphinx", "sphinx-copybutton", "sphinx-rtd-theme"]
+docs = ["aiohttp (>=3.9.4,<4)", "myst-parser", "sphinx", "sphinx-copybutton", "sphinx-rtd-theme"]
+kerberos = ["requests-kerberos"]
 
 [[package]]
 name = "orjson"
@@ -1699,6 +1813,17 @@ spss = ["pyreadstat (>=1.2.0)"]
 sql-other = ["SQLAlchemy (>=2.0.0)", "adbc-driver-postgresql (>=0.8.0)", "adbc-driver-sqlite (>=0.8.0)"]
 test = ["hypothesis (>=6.46.1)", "pytest (>=7.3.2)", "pytest-xdist (>=2.2.0)"]
 xml = ["lxml (>=4.9.2)"]
+
+[[package]]
+name = "pefile"
+version = "2024.8.26"
+description = "Python PE parsing module"
+optional = false
+python-versions = ">=3.6.0"
+files = [
+    {file = "pefile-2024.8.26-py3-none-any.whl", hash = "sha256:76f8b485dcd3b1bb8166f1128d395fa3d87af26360c2358fb75b80019b957c6f"},
+    {file = "pefile-2024.8.26.tar.gz", hash = "sha256:3ff6c5d8b43e8c37bb6e6dd5085658d658a7a0bdcd20b6a07b1fcfc1c4e9d632"},
+]
 
 [[package]]
 name = "pillow"
@@ -2228,6 +2353,17 @@ files = [
 cli = ["click (>=5.0)"]
 
 [[package]]
+name = "python-ptrace"
+version = "0.9.9"
+description = "python binding of ptrace"
+optional = false
+python-versions = "*"
+files = [
+    {file = "python-ptrace-0.9.9.tar.gz", hash = "sha256:56bbfef44eaf3a77be48138cca5767cdf471e8278fe1499f9b72f151907f25cf"},
+    {file = "python_ptrace-0.9.9-py2.py3-none-any.whl", hash = "sha256:8c97d23d55e551e7d7c5b104b87635fdd27d6c188c9cc205e8d0f6d71272b712"},
+]
+
+[[package]]
 name = "pytz"
 version = "2024.2"
 description = "World timezone definitions, modern and historical"
@@ -2312,17 +2448,20 @@ develop = true
 [package.dependencies]
 boto3 = "^1.34.160"
 elasticsearch = "^8.15.0"
+haystack = "^0.42"
 kneed = "^0.8.5"
-langchain = "^0.2.13"
-langchain-aws = "^0.1.17"
-langchain-community = "^0.2.12"
-langchain-elasticsearch = "^0.2.2"
-langchain_openai = "^0.1.21"
-langgraph = "^0.2.15"
+langchain = "^0.3.4"
+langchain-aws = "^0.2.3"
+langchain-community = ">0.2.12"
+langchain-elasticsearch = ">0.2.2"
+langchain_openai = ">0.1.21"
+langgraph = "^0.2.39"
+opensearch-py = "^2.7.1"
 pydantic = "^2.7.1"
 pydantic-settings = "^2.3.4"
 pytest-dotenv = "^0.5.2"
 tiktoken = "^0.7.0"
+wikipedia = "^1.4.0"
 
 [package.source]
 type = "directory"
@@ -2820,6 +2959,17 @@ files = [
 ]
 
 [[package]]
+name = "soupsieve"
+version = "2.6"
+description = "A modern CSS selector implementation for Beautiful Soup."
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "soupsieve-2.6-py3-none-any.whl", hash = "sha256:e72c4ff06e4fb6e4b5a9f0f55fe6e81514581fca1515028625d0f299c602ccc9"},
+    {file = "soupsieve-2.6.tar.gz", hash = "sha256:e2e68417777af359ec65daac1057404a3c8a5455bb8abc36f1a9866ab1a51abb"},
+]
+
+[[package]]
 name = "sqlalchemy"
 version = "2.0.35"
 description = "Database Abstraction Library"
@@ -3154,6 +3304,20 @@ files = [
 
 [package.extras]
 watchmedo = ["PyYAML (>=3.10)"]
+
+[[package]]
+name = "wikipedia"
+version = "1.4.0"
+description = "Wikipedia API for Python"
+optional = false
+python-versions = "*"
+files = [
+    {file = "wikipedia-1.4.0.tar.gz", hash = "sha256:db0fad1829fdd441b1852306e9856398204dc0786d2996dd2e0c8bb8e26133b2"},
+]
+
+[package.dependencies]
+beautifulsoup4 = "*"
+requests = ">=2.0.0,<3.0.0"
 
 [[package]]
 name = "yarl"
