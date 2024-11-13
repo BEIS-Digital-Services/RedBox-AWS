@@ -4,11 +4,12 @@ from typing import TYPE_CHECKING
 from langchain_core.runnables import RunnableParallel
 from langchain_elasticsearch.vectorstores import BM25Strategy, ElasticsearchStore
 from langchain_community.vectorstores import OpenSearchVectorSearch
+from redbox_app.setting_enums import Environment
 
 from redbox.chains.components import get_embeddings
 from redbox.chains.ingest import ingest_from_loader
 from redbox.loader.loaders import MetadataLoader, UnstructuredChunkLoader
-from redbox.models.settings import ENVIRONMENT, get_settings
+from redbox.models.settings import get_settings
 from redbox.models.file import ChunkResolution
 import environ
 
@@ -22,6 +23,8 @@ log = logging.getLogger()
 
 env = get_settings()
 env_vars = environ.Env()
+ENVIRONMENT = Environment[env_vars.str("ENVIRONMENT").upper()]
+
 alias = env.elastic_chunk_alias
 
 if ENVIRONMENT.is_local:
