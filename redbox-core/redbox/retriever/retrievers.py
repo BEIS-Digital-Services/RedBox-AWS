@@ -5,7 +5,7 @@ from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Union
 import opensearchpy
 from opensearchpy import OpenSearch
 from elasticsearch import Elasticsearch
-from elasticsearch.helpers import scan
+from opensearchpy.helpers import scan
 from kneed import KneeLocator
 from langchain_core.callbacks import CallbackManagerForRetrieverRun
 from langchain_core.documents import Document
@@ -302,7 +302,7 @@ class AllElasticsearchRetriever(OpenSearchRetriever):
         results = [
             self.document_mapper(hit)
             for hit in scan(
-                client=self.es_client, index=self.index_name, query=body, source=True
+                client=self.es_client, index=self.index_name, query=body, _source=True
             )
         ]
 
@@ -337,7 +337,7 @@ class MetadataRetriever(OpenSearchRetriever):
         results = [
             self.document_mapper(hit)
             for hit in scan(
-                client=self.es_client, index=self.index_name, query=body, source=True
+                client=self.es_client, index=self.index_name, query=body, _source=True
             )
         ]
 
