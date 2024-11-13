@@ -1,5 +1,5 @@
 # npm
-FROM public.ecr.aws/docker/library/node:18 AS npm-packages
+FROM public.ecr.aws/docker/library/node:20 AS npm-packages
 
 WORKDIR /src
 
