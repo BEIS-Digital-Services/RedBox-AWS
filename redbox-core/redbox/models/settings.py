@@ -140,9 +140,7 @@ class Settings(BaseSettings):
         "to make it as discoverable as possible. You are about to be given the first "
         "1_000 tokens of a document and any hard-coded file metadata that can be "
         "recovered from it. Create SEO-optimised metadata for this document."
-        "Description must be less than 100 words. and no more than 5 keywords ."
-        "Provide only the requested metadata in JSON format. Do not include any additional text outside of the JSON, respond only with a JSON object."
-        ,
+        "Description must be less than 100 words. and no more than 5 keywords .",
     )
 
     @property
