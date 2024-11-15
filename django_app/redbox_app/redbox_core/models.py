@@ -636,10 +636,20 @@ class File(UUIDPrimaryKeyBase, TimeStampedModel):
         return self.original_file.name
 
     def get_status_text(self) -> str:
-        return next(
-            (status[1] for status in File.Status.choices if self.status == status[0]),
-            "Unknown",
-        )
+        permanent_error = "Error"
+        temporary_error = "Error, please try again"
+        if self.ingest_error:
+            temporary_error_substrings = [
+                "ConnectionError",
+                "RateLimitError",
+                "ConnectTimeout",
+                "openai.InternalServerError",
+            ]
+            for substring in temporary_error_substrings:
+                if substring in self.ingest_error:
+                    return temporary_error
+            return permanent_error
+        return dict(File.Status.choices).get(self.status, permanent_error)
 
     @property
     def expires_at(self) -> datetime:
@@ -852,7 +862,7 @@ class ChatMessage(UUIDPrimaryKeyBase, TimeStampedModel):
             "user_id": str(self.chat.user.id),
             "text": str(self.text),
             "route": str(self.route),
-            "role": "ai",
+            "role": str(self.role),
             "token_count": token_sum,
             "rating": int(self.rating) if self.rating else None,
             "rating_text": str(self.rating_text),
@@ -861,7 +871,7 @@ class ChatMessage(UUIDPrimaryKeyBase, TimeStampedModel):
         es_client.create(
             index=env.elastic_chat_mesage_index,
             id=uuid.uuid4(),
-            document=elastic_log_msg,
+            body=elastic_log_msg,
         )
 
     def unique_citation_uris(self) -> list[tuple[str, str]]:
