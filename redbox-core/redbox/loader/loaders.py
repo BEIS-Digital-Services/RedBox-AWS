@@ -8,6 +8,7 @@ from langchain_core.prompts import PromptTemplate
 import requests
 import tiktoken
 from langchain_core.documents import Document
+import re
 
 
 from redbox.chains.components import get_chat_llm
@@ -74,6 +75,12 @@ class MetadataLoader:
 
         try:
             metadata = self.create_file_metadata(first_thousand_words, original_metadata=original_metadata)
+
+            # Extracting the JSON part using a regex
+            json_match = re.search(r"\{.*\}", metadata, re.DOTALL)
+            if json_match:
+                metadata = json_match.group(0)  # Get the matched JSON content
+
         except TypeError:
             metadata = GeneratedMetadata(name=original_metadata.get("filename"))
         return metadata
