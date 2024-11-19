@@ -12,6 +12,9 @@ from redbox.loader.loaders import MetadataLoader, UnstructuredChunkLoader
 from redbox.models.settings import get_settings
 from redbox.models.file import ChunkResolution
 import environ
+from langchain_core.exceptions import OutputParserException
+import json
+import re
 
 if TYPE_CHECKING:
     from mypy_boto3_s3.client import S3Client
@@ -31,6 +34,21 @@ if ENVIRONMENT.is_local:
     opensearch_url="https://localhost:9200"
 else:
     opensearch_url = f"https://{env_vars.str('ELASTIC__COLLECTION_ENPDOINT')}"
+
+def clean_json_metadata(raw_metadata: str) -> str:
+    """Clean and extract valid JSON from raw metadata."""
+    try:
+        # Use regex to extract JSON object
+        json_match = re.search(r"{.*}", raw_metadata, re.DOTALL)
+        if json_match:
+            json_data = json_match.group()
+            # Validate that it's valid JSON
+            json.loads(json_data)
+            return json_data
+        else:
+            raise ValueError("No JSON object found in metadata.")
+    except json.JSONDecodeError as e:
+        raise OutputParserException(f"Failed to parse metadata JSON: {e}")
 
 def get_elasticsearch_store(es, es_index_name: str):
     #return ElasticsearchStore(
@@ -94,7 +112,13 @@ def _ingest_file(file_name: str, es_index_name: str = alias):
 
     # Extract metadata
     metadata_loader = MetadataLoader(env=env, s3_client=env.s3_client(), file_name=file_name)
-    metadata = metadata_loader.extract_metadata()
+    raw_metadata = metadata_loader.extract_metadata()
+    try:
+        metadata = clean_json_metadata(raw_metadata)
+        logging.info(f"Cleaned metadata: {metadata}")
+    except OutputParserException as e:
+        logging.error(f"Failed to clean metadata: {e}")
+        raise
 
     # Initialize chunk_ingest_chain
     vectorstore_normal = get_elasticsearch_store(es, es_index_name)
