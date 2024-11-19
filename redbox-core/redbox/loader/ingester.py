@@ -86,17 +86,19 @@ def _ingest_file(file_name: str, es_index_name: str = alias):
 
     if es_index_name == alias:
         if not es.indices.exists_alias(name=alias):
-            print("The alias does not exist")
-            print(alias)
-            print(es.indices.exists_alias(name=alias))
+            logging.info("The alias does not exist")
+            logging.info(f"Alias: {alias}, Exists: {es.indices.exists_alias(name=alias)}")
             create_alias(alias)
     else:
-        #es.options(ignore_status=[400]).indices.create(index=es_index_name)
         es.indices.create(index=es_index_name, ignore=400)
 
     # Extract metadata
     metadata_loader = MetadataLoader(env=env, s3_client=env.s3_client(), file_name=file_name)
     metadata = metadata_loader.extract_metadata()
+
+    # Initialize chunk_ingest_chain
+    vectorstore_normal = get_elasticsearch_store(es, es_index_name)
+    logging.info(f"Vectorstore (normal) initialized: {vectorstore_normal}")
 
     chunk_ingest_chain = ingest_from_loader(
         loader=UnstructuredChunkLoader(
@@ -108,9 +110,13 @@ def _ingest_file(file_name: str, es_index_name: str = alias):
             metadata=metadata,
         ),
         s3_client=env.s3_client(),
-        vectorstore=get_elasticsearch_store(es, es_index_name),
+        vectorstore=vectorstore_normal,
         env=env,
     )
+
+    # Initialize large_chunk_ingest_chain
+    vectorstore_large = get_elasticsearch_store_without_embeddings(es, es_index_name)
+    logging.info(f"Vectorstore (large) initialized: {vectorstore_large}")
 
     large_chunk_ingest_chain = ingest_from_loader(
         loader=UnstructuredChunkLoader(
@@ -122,20 +128,21 @@ def _ingest_file(file_name: str, es_index_name: str = alias):
             metadata=metadata,
         ),
         s3_client=env.s3_client(),
-        vectorstore=get_elasticsearch_store_without_embeddings(es, es_index_name),
+        vectorstore=vectorstore_large,
         env=env,
     )
 
+    # Process the chains
     new_ids = {
-    "normal": chunk_ingest_chain.invoke(file_name),
-    "largest": large_chunk_ingest_chain.invoke(file_name),
+        "normal": chunk_ingest_chain.invoke(file_name),
+        "largest": large_chunk_ingest_chain.invoke(file_name),
     }
-    #new_ids = RunnableParallel({"normal": chunk_ingest_chain, "largest": large_chunk_ingest_chain}).invoke(file_name)
     logging.info(
         "File: %s %s chunks ingested",
         file_name,
         {k: len(v) for k, v in new_ids.items()},
     )
+
 
 
 def ingest_file(file_name: str, es_index_name: str = alias) -> str | None:
