@@ -114,7 +114,13 @@ def _ingest_file(file_name: str, es_index_name: str = alias):
     metadata_loader = MetadataLoader(env=env, s3_client=env.s3_client(), file_name=file_name)
     raw_metadata = metadata_loader.extract_metadata()
     try:
-        metadata = clean_json_metadata(raw_metadata)
+        # Ensure `raw_metadata` is converted to a JSON string if it's an object
+        if isinstance(raw_metadata, dict) or hasattr(raw_metadata, "dict"):
+            raw_metadata_json = json.dumps(raw_metadata.dict() if hasattr(raw_metadata, "dict") else raw_metadata)
+        else:
+            raw_metadata_json = str(raw_metadata)
+
+        metadata = clean_json_metadata(raw_metadata_json)
         logging.info(f"Cleaned metadata: {metadata}")
     except OutputParserException as e:
         logging.error(f"Failed to clean metadata: {e}")
