@@ -126,7 +126,11 @@ def _ingest_file(file_name: str, es_index_name: str = alias):
         env=env,
     )
 
-    new_ids = RunnableParallel({"normal": chunk_ingest_chain, "largest": large_chunk_ingest_chain}).invoke(file_name)
+    new_ids = {
+    "normal": chunk_ingest_chain.invoke(file_name),
+    "largest": large_chunk_ingest_chain.invoke(file_name),
+    }
+    #new_ids = RunnableParallel({"normal": chunk_ingest_chain, "largest": large_chunk_ingest_chain}).invoke(file_name)
     logging.info(
         "File: %s %s chunks ingested",
         file_name,
