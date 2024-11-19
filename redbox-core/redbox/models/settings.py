@@ -162,6 +162,9 @@ class Settings(BaseSettings):
             port = 9200
         else:
             credentials = boto3.Session().get_credentials()
+            credentials = credentials.get_frozen_credentials()
+            logger.info(f"Refreshed credentials: {credentials}")
+            
             auth = AWSV4SignerAuth(credentials, "eu-west-2")
             use_ssl = True
             verify_certs = True
@@ -177,6 +180,9 @@ class Settings(BaseSettings):
             max_retries=3,
             retry_on_timeout=True,
         )
+
+        logger.info(f"Client hosts: {client.transport.hosts}")
+        logger.info(f"Client connection class: {client.transport.connection_class}")
 
         if not client.indices.exists_alias(
             name=f"{self.elastic_root_index}-chunk-current"
