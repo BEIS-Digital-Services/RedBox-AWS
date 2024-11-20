@@ -130,7 +130,7 @@ def _ingest_file(file_name: str, es_index_name: str = alias):
 
     # Initialize chunk_ingest_chain
     vectorstore_normal = get_elasticsearch_store(es, es_index_name)
-    log.info(f"Vectorstore (normal) initialized: {vectorstore_normal}")
+    log.warning(f"Vectorstore (normal) initialized: {vectorstore_normal}")
 
     chunk_ingest_chain = ingest_from_loader(
         loader=UnstructuredChunkLoader(
@@ -148,7 +148,7 @@ def _ingest_file(file_name: str, es_index_name: str = alias):
 
     # Initialize large_chunk_ingest_chain
     vectorstore_large = get_elasticsearch_store_without_embeddings(es, es_index_name)
-    logging.info(f"Vectorstore (large) initialized: {vectorstore_large}")
+    log.warning(f"Vectorstore (large) initialized: {vectorstore_large}")
 
     large_chunk_ingest_chain = ingest_from_loader(
         loader=UnstructuredChunkLoader(
