@@ -149,7 +149,7 @@ class UnstructuredChunkLoader:
             elif isinstance(metadata, GeneratedMetadata):
                 self.metadata = metadata
             else:
-                raise TypeError(f"Unsupported metadata type: {type(metadata)}")
+                raise TypeError(f"Unsupported metadata type: {type(metadata)}, {metadata}")
         except ValidationError as e:
             logging.error(f"Failed to parse metadata: {e}")
             raise
