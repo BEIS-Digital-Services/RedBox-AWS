@@ -189,6 +189,24 @@ class Settings(BaseSettings):
         except Exception as e:
             logger.error(f"Failed to authenticate OpenSearch client: {e}")
 
+        try:
+            # Call the security plugin to verify authenticated user/role
+            auth_info = client.transport.perform_request(
+                method="GET",
+                url="/_plugins/_security/api/authinfo"
+            )
+            logger.warning(f"Authenticated user info: {auth_info}")
+
+            # Check the specific user or role returned
+            if "user_name" in auth_info:
+                logger.warning(f"Authenticated as user: {auth_info['user_name']}")
+            else:
+                logger.error("No user_name in auth_info, authentication might have failed.")
+
+        except Exception as e:
+            logger.error(f"Failed to verify authentication with /_security/api/authinfo: {e}")
+
+
         logger.warning(f"Client hosts: {client.transport.hosts}")
         logger.warning(f"Client connection class: {client.transport.connection_class}")
 
