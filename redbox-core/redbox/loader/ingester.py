@@ -88,6 +88,7 @@ def get_elasticsearch_store_without_embeddings(es, es_index_name: str):
 
 
 def create_alias(alias: str):
+    log.warning("inside ingestor.py inside create_alias")
     es = env.elasticsearch_client()
 
     chunk_index_name = alias[:-8]  # removes -current
@@ -98,14 +99,15 @@ def create_alias(alias: str):
 
 
 def _ingest_file(file_name: str, es_index_name: str = alias):
-    logging.info("Ingesting file: %s", file_name)
+    log.warning("inside ingestor.py inside _ingest_file")
+    log.info("Ingesting file: %s", file_name)
 
     es = env.elasticsearch_client()
 
     if es_index_name == alias:
         if not es.indices.exists_alias(name=alias):
-            logging.info("The alias does not exist")
-            logging.info(f"Alias: {alias}, Exists: {es.indices.exists_alias(name=alias)}")
+            log.info("The alias does not exist")
+            log.info(f"Alias: {alias}, Exists: {es.indices.exists_alias(name=alias)}")
             create_alias(alias)
     else:
         es.indices.create(index=es_index_name, ignore=400)
@@ -121,14 +123,14 @@ def _ingest_file(file_name: str, es_index_name: str = alias):
             raw_metadata_json = str(raw_metadata)
 
         metadata = clean_json_metadata(raw_metadata_json)
-        logging.info(f"Cleaned metadata: {metadata}")
+        log.info(f"Cleaned metadata: {metadata}")
     except OutputParserException as e:
-        logging.error(f"Failed to clean metadata: {e}")
+        log.error(f"Failed to clean metadata: {e}")
         raise
 
     # Initialize chunk_ingest_chain
     vectorstore_normal = get_elasticsearch_store(es, es_index_name)
-    logging.info(f"Vectorstore (normal) initialized: {vectorstore_normal}")
+    log.info(f"Vectorstore (normal) initialized: {vectorstore_normal}")
 
     chunk_ingest_chain = ingest_from_loader(
         loader=UnstructuredChunkLoader(
@@ -164,7 +166,7 @@ def _ingest_file(file_name: str, es_index_name: str = alias):
 
     # Process the chains
     new_ids = RunnableParallel({"normal": chunk_ingest_chain, "largest": large_chunk_ingest_chain}).invoke(file_name)
-    
+
     logging.info(
         "File: %s %s chunks ingested",
         file_name,
