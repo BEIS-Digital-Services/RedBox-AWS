@@ -83,6 +83,7 @@ def get_embeddings(env: Settings) -> Embeddings:
 
 
 def get_all_chunks_retriever(env: Settings) -> OpenSearchRetriever:
+    logger.warning("inside components.py inside get_all_chunks_retriever")
     return AllElasticsearchRetriever(
         es_client=env.elasticsearch_client(),
         index_name=env.elastic_chunk_alias,
@@ -90,6 +91,7 @@ def get_all_chunks_retriever(env: Settings) -> OpenSearchRetriever:
 
 
 def get_parameterised_retriever(env: Settings, embeddings: Embeddings | None = None):
+    logger.warning("inside components.py inside get_parameterised_retriever")
     """Creates an Elasticsearch retriever runnable.
 
     Runnable takes input of a dict keyed to question, file_uuids and user_uuid.
@@ -105,6 +107,7 @@ def get_parameterised_retriever(env: Settings, embeddings: Embeddings | None = N
 
 
 def get_metadata_retriever(env: Settings):
+    logger.warning("inside components.py inside get_metadata_retriever")
     return MetadataRetriever(
         es_client=env.elasticsearch_client(),
         index_name=env.elastic_chunk_alias,

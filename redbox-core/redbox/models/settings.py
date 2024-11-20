@@ -152,21 +152,25 @@ class Settings(BaseSettings):
 
     @lru_cache(1)
     def elasticsearch_client(self) -> Union[Elasticsearch, OpenSearch]:
-        logger.info("Testing OpenSearch is definitely being used")
+        logger.warning("Testing OpenSearch is definitely being used")
+
         if ENVIRONMENT.is_local:
             auth = ("admin", "MyStrongPassword1!")
             use_ssl = False
             verify_certs = False
             port = 9200
+            logger.warning("Using local environment with basic auth")
         else:
             credentials = boto3.Session().get_credentials()
             credentials = credentials.get_frozen_credentials()
-            logger.info(f"Refreshed credentials: {credentials}")
-            
+            logger.warning(f"Using AWS credentials: Access Key - {credentials.access_key[:4]}...")  # Masking for security
+
             auth = AWSV4SignerAuth(credentials, "eu-west-2")
             use_ssl = True
             verify_certs = True
             port = 443
+            logger.warning("Using AWS authentication with V4 signer")
+
         client = OpenSearch(
             hosts=[{"host": env.str("ELASTIC__COLLECTION_ENPDOINT"), "port": port}],
             http_auth=auth,
@@ -179,32 +183,46 @@ class Settings(BaseSettings):
             retry_on_timeout=True,
         )
 
-        logger.info(f"Client hosts: {client.transport.hosts}")
-        logger.info(f"Client connection class: {client.transport.connection_class}")
+        try:
+            # Perform a simple authenticated request to verify the client
+            health = client.cluster.health()
+            logger.warning(f"Cluster health check successful: {health}")
+        except Exception as e:
+            logger.error(f"Failed to authenticate OpenSearch client: {e}")
 
-        if not client.indices.exists_alias(
-            name=f"{self.elastic_root_index}-chunk-current"
-        ):
-            chunk_index = f"{self.elastic_root_index}-chunk"
+        logger.warning(f"Client hosts: {client.transport.hosts}")
+        logger.warning(f"Client connection class: {client.transport.connection_class}")
 
-            # Ensure index creation does not raise an error if it already exists.
-            try:
-                client.indices.create(
-                    index=chunk_index, ignore=400
-                )  # 400 is ignored to avoid index-already-exists errors
-            except Exception as e:
-                logger.error(f"Failed to create index {chunk_index}: {e}")
+        try:
+            if not client.indices.exists_alias(
+                name=f"{self.elastic_root_index}-chunk-current"
+            ):
+                logger.info("Alias does not exist, proceeding to create index and alias")
+                chunk_index = f"{self.elastic_root_index}-chunk"
 
-            try:
-                client.indices.put_alias(
-                    index=chunk_index, name=f"{self.elastic_root_index}-chunk-current"
-                )
-            except Exception as e:
-                logger.error(
-                    f"Failed to set alias {self.elastic_root_index}-chunk-current: {e}"
-                )
+                # Ensure index creation does not raise an error if it already exists.
+                try:
+                    client.indices.create(
+                        index=chunk_index, ignore=400
+                    )  # 400 is ignored to avoid index-already-exists errors
+                    logger.info(f"Index {chunk_index} created successfully")
+                except Exception as e:
+                    logger.error(f"Failed to create index {chunk_index}: {e}")
+
+                try:
+                    client.indices.put_alias(
+                        index=chunk_index, name=f"{self.elastic_root_index}-chunk-current"
+                    )
+                    logger.info(f"Alias {self.elastic_root_index}-chunk-current created successfully")
+                except Exception as e:
+                    logger.error(
+                        f"Failed to set alias {self.elastic_root_index}-chunk-current: {e}"
+                    )
+        except Exception as e:
+            logger.error(f"Error while checking or creating alias: {e}")
 
         return client
+
 
     def s3_client(self):
         if self.object_store == "minio":
