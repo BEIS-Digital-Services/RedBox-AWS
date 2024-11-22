@@ -7,7 +7,8 @@ import boto3
 import environ
 from elasticsearch import Elasticsearch
 from openai import max_retries
-from opensearchpy import AWSV4SignerAuth, OpenSearch, RequestsHttpConnection
+from opensearchpy import OpenSearch, RequestsHttpConnection
+from requests_aws4auth import AWS4Auth  # Updated import
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from redbox_app.setting_enums import Environment
@@ -100,7 +101,7 @@ class Settings(BaseSettings):
     beats_system_password: str = "redboxpass"
 
     minio_host: str = "minio"
-    minio_port: int = 9000
+    minio_port: int = 9025
     aws_access_key: str | None = None
     aws_secret_key: str | None = None
 
@@ -165,12 +166,20 @@ class Settings(BaseSettings):
             credentials = credentials.get_frozen_credentials()
             logger.info(f"Refreshed credentials: {credentials}")
             
-            auth = AWSV4SignerAuth(credentials, "eu-west-2")
+            # Initialize AWS4Auth for SigV4 signing
+            awsauth = AWS4Auth(
+                credentials.access_key,
+                credentials.secret_key,
+                self.aws_region,  
+                'es',             
+                session_token=credentials.token
+            )
+            auth = awsauth
             use_ssl = True
             verify_certs = True
             port = 443
         client = OpenSearch(
-            hosts=[{"host": env.str("ELASTIC__COLLECTION_ENPDOINT"), "port": port}],
+            hosts=[{"host": self.elastic.collection_endpoint, "port": port}],
             http_auth=auth,
             use_ssl=use_ssl,
             verify_certs=verify_certs,
