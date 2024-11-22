@@ -161,8 +161,6 @@ class Settings(BaseSettings):
             logger.warning("Using local environment with basic auth")
         else:
             credentials = boto3.Session().get_credentials()
-            credentials = credentials.get_frozen_credentials()
-
             auth = AWSV4SignerAuth(credentials, "eu-west-2")
             use_ssl = True
             verify_certs = True
