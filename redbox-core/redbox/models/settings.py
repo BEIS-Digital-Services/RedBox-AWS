@@ -136,13 +136,11 @@ class Settings(BaseSettings):
 
     ## Prompts
     metadata_prompt: tuple = (
-        "system",
-        "You are an SEO specialist that must optimise the metadata of a document "
-        "to make it as discoverable as possible. You are about to be given the first "
-        "1_000 tokens of a document and any hard-coded file metadata that can be "
-        "recovered from it. Create SEO-optimised metadata for this document."
-        "Description must be less than 100 words. and no more than 5 keywords ."
-        "Provide only the requested metadata in JSON format. Do not include any additional text outside of the JSON, respond only with a JSON object.",
+        {
+            "system", 
+            "You are an SEI specialist that must optimise the metadata of a document to make it as discoverable as possible. You are about to be given the first 1,000 tokens of a document and any hard-coded file metadata that can be recovered from it. Create SEI-optimised metadata for this document. Description must be less than 100 words and no more than 5 keywords. Respond strictly in valid JSON format. Do not include any additional text or commentary. Provide only the requested metadata as a JSON object."
+        }
+
     )
 
     @property
@@ -153,14 +151,15 @@ class Settings(BaseSettings):
     def elastic_alias(self):
         return self.elastic_root_index + "-chunk-current"
 
-    @lru_cache(1)
     def elasticsearch_client(self) -> Union[Elasticsearch, OpenSearch]:
-        logger.info("Testing OpenSearch is definitely being used")
+        logger.warning("Testing OpenSearch is definitely being used")
+
         if ENVIRONMENT.is_local:
             auth = ("admin", "MyStrongPassword1!")
             use_ssl = False
             verify_certs = False
             port = 9200
+            logger.warning("Using local environment with basic auth")
         else:
             credentials = boto3.Session().get_credentials()
             credentials = credentials.get_frozen_credentials()
@@ -177,6 +176,8 @@ class Settings(BaseSettings):
             use_ssl = True
             verify_certs = True
             port = 443
+            logger.warning("Using AWS authentication with V4 signer")
+
         client = OpenSearch(
             hosts=[{"host": env.str("ELASTIC__COLLECTION_ENPDOINT"), "port": port}],
             http_auth=auth,
@@ -189,32 +190,48 @@ class Settings(BaseSettings):
             retry_on_timeout=True,
         )
 
-        logger.info(f"Client hosts: {client.transport.hosts}")
-        logger.info(f"Client connection class: {client.transport.connection_class}")
+        # Fetch and list all indices in the OpenSearch cluster
+        try:
+            indices = client.cat.indices(format="json")
+            print("Indices in the cluster:")
+            for index in indices:
+                 logger.warning(f"- {index['index']}")
+        except Exception as e:
+            logger.warning(f"Error fetching indices: {e}")
 
-        if not client.indices.exists_alias(
-            name=f"{self.elastic_root_index}-chunk-current"
-        ):
-            chunk_index = f"{self.elastic_root_index}-chunk"
+        logger.warning(f"Client hosts: {client.transport.hosts}")
+        logger.warning(f"Client connection class: {client.transport.connection_class}")
 
-            # Ensure index creation does not raise an error if it already exists.
-            try:
-                client.indices.create(
-                    index=chunk_index, ignore=400
-                )  # 400 is ignored to avoid index-already-exists errors
-            except Exception as e:
-                logger.error(f"Failed to create index {chunk_index}: {e}")
+        try:
+            if not client.indices.exists_alias(
+                name=f"{self.elastic_root_index}-chunk-current"
+            ):
+                logger.info("Alias does not exist, proceeding to create index and alias")
+                chunk_index = f"{self.elastic_root_index}-chunk"
 
-            try:
-                client.indices.put_alias(
-                    index=chunk_index, name=f"{self.elastic_root_index}-chunk-current"
-                )
-            except Exception as e:
-                logger.error(
-                    f"Failed to set alias {self.elastic_root_index}-chunk-current: {e}"
-                )
+                # Ensure index creation does not raise an error if it already exists.
+                try:
+                    client.indices.create(
+                        index=chunk_index, ignore=400
+                    )  # 400 is ignored to avoid index-already-exists errors
+                    logger.info(f"Index {chunk_index} created successfully")
+                except Exception as e:
+                    logger.error(f"Failed to create index {chunk_index}: {e}")
+
+                try:
+                    client.indices.put_alias(
+                        index=chunk_index, name=f"{self.elastic_root_index}-chunk-current"
+                    )
+                    logger.info(f"Alias {self.elastic_root_index}-chunk-current created successfully")
+                except Exception as e:
+                    logger.error(
+                        f"Failed to set alias {self.elastic_root_index}-chunk-current: {e}"
+                    )
+        except Exception as e:
+            logger.error(f"Error while checking or creating alias: {e}")
 
         return client
+
 
     def s3_client(self):
         if self.object_store == "minio":

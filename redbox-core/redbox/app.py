@@ -54,7 +54,7 @@ class Redbox:
         self.embedding_model = embedding_model or get_embeddings(_env)
 
         # Tools
-
+        logger.warning("inside app.py")
         search_documents = build_search_documents_tool(
             es_client=_env.elasticsearch_client(),
             index_name=f"{_env.elastic_root_index}-chunk",

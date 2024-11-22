@@ -9,12 +9,14 @@ import requests
 import tiktoken
 from langchain_core.documents import Document
 import re
+from django.core.exceptions import ValidationError
 
 
 from redbox.chains.components import get_chat_llm
 from redbox.models.file import ChunkResolution, UploadedFileMetadata
 from redbox.models.settings import Settings
 from redbox.models.chain import GeneratedMetadata
+import json
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
@@ -75,8 +77,22 @@ class MetadataLoader:
 
         try:
             metadata = self.create_file_metadata(first_thousand_words, original_metadata=original_metadata)
-        except TypeError:
-            metadata = GeneratedMetadata(name=original_metadata.get("filename"))
+        except Exception as e:
+            logging.error(f"Failed to create file metadata: {e}")
+            metadata = GeneratedMetadata(
+                name=original_metadata.get("filename") or original_metadata.get("file_name") or original_metadata.get("name") or "Unknown",
+                description=None,
+                keywords=[]
+            )
+
+        # Ensure metadata is an object, not a JSON string
+        if isinstance(metadata, str):
+            try:
+                metadata = GeneratedMetadata(**json.loads(metadata))
+            except Exception as e:
+                logging.error(f"Failed to parse metadata string: {metadata}. Error: {e}")
+                metadata = GeneratedMetadata(name="Unknown", description=None, keywords=[])
+
         return metadata
 
     def create_file_metadata(self, page_content: str, original_metadata: dict | None = None) -> GeneratedMetadata:
@@ -134,7 +150,27 @@ class UnstructuredChunkLoader:
         self._max_chunk_size = max_chunk_size
         self._overlap_chars = overlap_chars
         self._overlap_all_chunks = overlap_all_chunks
-        self.metadata = metadata
+
+        # Validate and parse metadata
+        if isinstance(metadata, str):
+            try:
+                metadata = json.loads(metadata)
+            except json.JSONDecodeError as e:
+                logging.error(f"Failed to decode metadata JSON: {metadata}. Error: {e}")
+                raise TypeError(f"Invalid metadata string: {metadata}")
+    
+        # Validate and convert metadata to GeneratedMetadata
+        try:
+            if isinstance(metadata, dict):
+                self.metadata = GeneratedMetadata(**metadata)
+            elif isinstance(metadata, GeneratedMetadata):
+                self.metadata = metadata
+            else:
+                raise TypeError(f"Unsupported metadata type: {type(metadata)}, {metadata}")
+        except ValidationError as e:
+            logging.error(f"Failed to parse metadata: {e}")
+            raise
+
 
     def lazy_load(self, file_name: str, file_bytes: BytesIO) -> Iterator[Document]:
         """A lazy loader that reads a file line by line.

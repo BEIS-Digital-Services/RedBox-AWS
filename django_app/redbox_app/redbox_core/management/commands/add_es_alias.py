@@ -1,9 +1,11 @@
 from django.core.management import BaseCommand
-
+import logging
 from redbox.models.settings import get_settings
 
 env = get_settings()
+logger = logging.getLogger(__name__)
 
+logger.warning("inside add_es_alias.py")
 es_client = env.elasticsearch_client()
 
 
