@@ -167,19 +167,18 @@ class Settings(BaseSettings):
             logger.info(f"Refreshed credentials: {credentials}")
             
             # Initialize AWS4Auth for SigV4 signing
-            awsauth = AWS4Auth(
+            auth = AWS4Auth(
                 credentials.access_key,
                 credentials.secret_key,
-                self.aws_region,  
+                "eu-west-2",  
                 'es',             
                 session_token=credentials.token
             )
-            auth = awsauth
             use_ssl = True
             verify_certs = True
             port = 443
         client = OpenSearch(
-            hosts=[{"host": self.elastic.collection_endpoint, "port": port}],
+            hosts=[{"host": env.str("ELASTIC__COLLECTION_ENPDOINT"), "port": port}],
             http_auth=auth,
             use_ssl=use_ssl,
             verify_certs=verify_certs,
