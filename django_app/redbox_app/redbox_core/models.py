@@ -871,7 +871,7 @@ class ChatMessage(UUIDPrimaryKeyBase, TimeStampedModel):
         }
         es_client.create(
             index=env.elastic_chat_mesage_index,
-            #id=uuid.uuid4(),
+            id=uuid.uuid4(),
             body=elastic_log_msg,
         )
 
