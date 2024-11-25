@@ -172,8 +172,14 @@ class Settings(BaseSettings):
             port = 443
             logger.warning("Using AWS authentication with V4 signer")
 
+        opensearch_url = env.str("ELASTIC__COLLECTION_ENPDOINT")
+
+        # Strip 'https://' from the URL
+        if opensearch_url.startswith("https://"):
+            opensearch_url = opensearch_url[len("https://"):]
+
         client = OpenSearch(
-            hosts=[{"host": env.str("ELASTIC__COLLECTION_ENPDOINT"), "port": port}],
+            hosts=[{"host": opensearch_url, "port": port}],
             http_auth=auth,
             use_ssl=use_ssl,
             verify_certs=verify_certs,
