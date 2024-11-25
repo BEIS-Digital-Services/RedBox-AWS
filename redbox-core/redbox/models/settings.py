@@ -166,7 +166,7 @@ class Settings(BaseSettings):
             logger.info(f"Refreshed credentials: {credentials}")
             
             # Initialize AWS4Auth for SigV4 signing
-            auth = AWSV4SignerAuth(credentials, "eu-west-2", service="es")
+            auth = AWSV4SignerAuth(credentials, "eu-west-2", service="aoss")
             use_ssl = True
             verify_certs = True
             port = 443
