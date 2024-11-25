@@ -7,7 +7,7 @@ import boto3
 import environ
 from elasticsearch import Elasticsearch
 from openai import max_retries
-from opensearchpy import OpenSearch, RequestsHttpConnection
+from opensearchpy import AWSV4SignerAuth, OpenSearch, RequestsHttpConnection
 from requests_aws4auth import AWS4Auth  # Updated import
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -166,13 +166,7 @@ class Settings(BaseSettings):
             logger.info(f"Refreshed credentials: {credentials}")
             
             # Initialize AWS4Auth for SigV4 signing
-            auth = AWS4Auth(
-                credentials.access_key,
-                credentials.secret_key,
-                "eu-west-2",  
-                'es',             
-                session_token=credentials.token
-            )
+            auth = AWSV4SignerAuth(credentials, "eu-west-2", service="aoss")
             use_ssl = True
             verify_certs = True
             port = 443

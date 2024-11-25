@@ -33,7 +33,7 @@ alias = env.elastic_chunk_alias
 if ENVIRONMENT.is_local:
     opensearch_url="https://localhost:9200"
 else:
-    opensearch_url = f"https://{env_vars.str('ELASTIC__COLLECTION_ENPDOINT')}"
+    opensearch_url = env_vars.str('ELASTIC__COLLECTION_ENPDOINT')
 
 def clean_json_metadata(raw_metadata: str) -> str:
     """Clean and extract valid JSON from raw metadata."""
