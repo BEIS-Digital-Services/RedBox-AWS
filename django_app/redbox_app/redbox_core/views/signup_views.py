@@ -18,14 +18,10 @@ class AbstractSignup(View):
     next_page = None
 
     def get(self, request: HttpRequest) -> HttpResponse:
-        if not settings.ALLOW_SIGN_UPS:
-            return redirect("homepage")
         form = SignUpForm()
         return render(request, f"{self.current_page}.html", {"form": form})
 
     def post(self, request: HttpRequest) -> HttpResponse:
-        if not settings.ALLOW_SIGN_UPS:
-            return redirect("homepage")
         combined_data = {**request.session.get("sign_up_data", {}), **request.POST.dict()}
         query_dict = QueryDict("", mutable=True)
         query_dict.update(combined_data)
@@ -43,20 +39,20 @@ class Signup1(AbstractSignup):
     next_page = "sign-up-page-2"
 
     def post(self, request: HttpRequest) -> HttpResponse:
-        if not settings.ALLOW_SIGN_UPS:
-            return redirect("homepage")
-        form = SignUpForm(request.POST)
+        combined_data = {**request.session.get("sign_up_data", {}), **request.POST.dict()}
+        query_dict = QueryDict("", mutable=True)
+        query_dict.update(combined_data)
 
-        # Only allow .gov.uk email accounts
-        email = request.POST.get("email")
-        if not email.endswith(".gov.uk"):
-            form.add_error("email", "The email must be a valid gov.uk email account")
+        # Remove `email` from POST data and rely on the authenticated user
+        form = SignUpForm(query_dict)
 
         if form.is_valid():
+            # Add email directly from the authenticated user
+            form.cleaned_data["email"] = request.user.email
             request.session["sign_up_data"] = form.cleaned_data
-            return redirect("sign-up-page-2")
+            return redirect(self.next_page)
         else:
-            return render(request, "sign-up-page-1.html", {"form": form})
+            return render(request, f"{self.current_page}.html", {"form": form})
 
 
 class Signup2(AbstractSignup):
@@ -84,8 +80,6 @@ class Signup6(AbstractSignup):
     next_page = "sign-up-page-7"
 
     def post(self, request: HttpRequest) -> HttpResponse:
-        if not settings.ALLOW_SIGN_UPS:
-            return redirect("homepage")
         combined_data = {**request.session.get("sign_up_data", {}), **request.POST.dict()}
         query_dict = QueryDict("", mutable=True)
         query_dict.update(combined_data)
@@ -101,20 +95,19 @@ class Signup6(AbstractSignup):
         ]
         for field in required_fields:
             if request.POST.get(field) != "on":
-                form.add_error(field, "You must give consent in order to sign up to Redbox")
+                form.add_error(field, "You must give consent in order to proceed.")
 
         if form.is_valid():
-            user = User.objects.create_user(email=request.session["sign_up_data"]["email"])
+            # Update the currently signed-in user
+            user = request.user
             for field_name, field_value in form.cleaned_data.items():
                 setattr(user, field_name, field_value)
-            user.save()
-            return redirect("sign-up-page-7")
+            user.save()  # Save the changes to the database
+            return redirect(self.next_page)
         else:
-            return render(request, "sign-up-page-6.html", {"form": form})
+            return render(request, f"{self.current_page}.html", {"form": form})
 
 
 class Signup7(View):
     def get(self, request: HttpRequest) -> HttpResponse:
-        if not settings.ALLOW_SIGN_UPS:
-            return redirect("homepage")
         return render(request, "sign-up-page-7.html")
