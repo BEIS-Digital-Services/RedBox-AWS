@@ -7,13 +7,14 @@ from urllib.parse import urlparse
 
 import environ
 import sentry_sdk
-from django.urls import reverse_lazy
+from django.urls import reverse_lazy, reverse
 from dotenv import load_dotenv
 from import_export.formats.base_formats import CSV
 from sentry_sdk.integrations.django import DjangoIntegration
 from storages.backends import s3boto3
 from yarl import URL
 from django.http import HttpRequest
+from django.shortcuts import redirect
 
 from redbox_app.setting_enums import Classification, Environment
 
@@ -88,6 +89,7 @@ MIDDLEWARE = [
     "redbox_app.redbox_core.middleware.security_header_middleware",
     "django_plotly_dash.middleware.BaseMiddleware",
     "waffle.middleware.WaffleMiddleware",
+    "redbox_app.redbox_core.middleware.EnforceConsentMiddleware"
 ]
 
 ROOT_URLCONF = "redbox_app.urls"
