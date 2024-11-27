@@ -2,17 +2,17 @@ import logging
 import os
 from functools import cache, lru_cache
 from typing import Literal, Union
+from urllib.parse import urlparse
 
 import boto3
 import environ
 from elasticsearch import Elasticsearch
-from openai import max_retries
-from opensearchpy import AWSV4SignerAuth, OpenSearch, RequestsHttpConnection
-from requests_aws4auth import AWS4Auth  # Updated import
-from pydantic import BaseModel
+from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth
+from pydantic import BaseModel, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from redbox_app.setting_enums import Environment
 from langchain.globals import set_debug
+
 
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
 logger = logging.getLogger()
@@ -24,8 +24,36 @@ class OpenSearchSettings(BaseModel):
     """settings required for a aws/opensearch"""
 
     model_config = SettingsConfigDict(frozen=True)
+    collection_endpoint: str
+    #collection_endpoint: str = env.str("ELASTIC__COLLECTION_ENPDOINT")
 
-    collection_endpoint: str = env.str("ELASTIC__COLLECTION_ENPDOINT")
+    @computed_field
+    @property
+    def user(self) -> str:
+        return urlparse(self.collection_endpoint).username
+
+    @computed_field
+    @property
+    def password(self) -> str:
+        return urlparse(self.collection_endpoint).password
+
+    @computed_field
+    @property
+    def host(self) -> str:
+        return urlparse(self.collection_endpoint).hostname
+
+    @computed_field
+    @property
+    def port(self) -> int:
+        return urlparse(self.collection_endpoint).port
+
+    @computed_field
+    @property
+    def opensearch_url(self) -> str:
+        url = urlparse(self.collection_endpoint)
+        if url.port is not None:
+            return f"{self.host}:{self.port}"
+        return self.host
 
 
 class ElasticLocalSettings(BaseModel):
@@ -185,7 +213,7 @@ class Settings(BaseSettings):
             verify_certs=verify_certs,
             connection_class=RequestsHttpConnection,
             pool_maxsize=100,
-            timeout=30,
+            timeout=120,
             max_retries=3,
             retry_on_timeout=True,
         )
@@ -202,33 +230,19 @@ class Settings(BaseSettings):
         logger.warning(f"Client hosts: {client.transport.hosts}")
         logger.warning(f"Client connection class: {client.transport.connection_class}")
 
-        try:
-            if not client.indices.exists_alias(
-                name=f"{self.elastic_root_index}-chunk-current"
-            ):
-                logger.info("Alias does not exist, proceeding to create index and alias")
-                chunk_index = f"{self.elastic_root_index}-chunk"
+        if not client.indices.exists_alias(name=self.elastic_alias):
+            chunk_index = f"{self.elastic_root_index}-chunk"
+            # Ensure index creation does not raise an error if it already exists.
+            try:
+                client.indices.create(
+                    index=chunk_index, ignore=400
+                )  # 400 is ignored to avoid index-already-exists errors
+            except Exception as e:
+                logger.error(f"Failed to create index {chunk_index}: {e}")
 
-                # Ensure index creation does not raise an error if it already exists.
-                try:
-                    client.indices.create(
-                        index=chunk_index, ignore=400
-                    )  # 400 is ignored to avoid index-already-exists errors
-                    logger.info(f"Index {chunk_index} created successfully")
-                except Exception as e:
-                    logger.error(f"Failed to create index {chunk_index}: {e}")
-
-                try:
-                    client.indices.put_alias(
-                        index=chunk_index, name=f"{self.elastic_root_index}-chunk-current"
-                    )
-                    logger.info(f"Alias {self.elastic_root_index}-chunk-current created successfully")
-                except Exception as e:
-                    logger.error(
-                        f"Failed to set alias {self.elastic_root_index}-chunk-current: {e}"
-                    )
-        except Exception as e:
-            logger.error(f"Error while checking or creating alias: {e}")
+            alias = f"{self.elastic_root_index}-chunk-current"
+            if not client.indices.exists_alias(name=alias):
+                client.indices.put_alias(index=chunk_index, name=alias)
 
         return client
 

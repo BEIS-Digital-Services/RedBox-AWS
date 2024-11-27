@@ -1,15 +1,15 @@
 import logging
 from typing import TYPE_CHECKING
 
-from langchain_core.runnables import RunnableParallel
-from langchain_elasticsearch.vectorstores import BM25Strategy, ElasticsearchStore
+from elasticsearch.helpers.vectorstore import BM25Strategy
 from langchain_community.vectorstores import OpenSearchVectorSearch
+from langchain_core.runnables import RunnableParallel
+from langchain_elasticsearch import ElasticsearchStore
 from redbox_app.setting_enums import Environment
-
 from redbox.chains.components import get_embeddings
 from redbox.chains.ingest import ingest_from_loader
 from redbox.loader.loaders import MetadataLoader, UnstructuredChunkLoader
-from redbox.models.settings import get_settings
+from redbox.models.settings import get_settings, ElasticLocalSettings, ElasticCloudSettings
 from redbox.models.file import ChunkResolution
 import environ
 from langchain_core.exceptions import OutputParserException
@@ -50,39 +50,22 @@ def clean_json_metadata(raw_metadata: str) -> str:
     except json.JSONDecodeError as e:
         raise OutputParserException(f"Failed to parse metadata JSON: {e}")
 
-def get_elasticsearch_store(es, es_index_name: str):
-    #return ElasticsearchStore(
-    #    index_name=es_index_name,
-    #    embedding=get_embeddings(env),
-    #    es_connection=es,
-    #    query_field="text",
-    #    vector_query_field=env.embedding_document_field_name,
-
+def get_elasticsearch_store(es_index_name: str):
+    log.info("using opensearch_url=%s", env.elastic.opensearch_url)
     return OpenSearchVectorSearch(
         index_name=es_index_name,
-        embedding=get_embeddings(env),
-        es_connection=es,
-        opensearch_url = opensearch_url,
+        opensearch_url=env.elastic.opensearch_url,
         embedding_function=get_embeddings(env),
         query_field="text",
         vector_query_field=env.embedding_document_field_name,
     )
 
 
-def get_elasticsearch_store_without_embeddings(es, es_index_name: str):
-    #return ElasticsearchStore(
-    #    index_name=es_index_name,
-    #    es_connection=es,
-    #    query_field="text",
-    #    strategy=BM25Strategy(),
-    #)
-
+def get_elasticsearch_store_without_embeddings(es_index_name: str):
+    log.info("using opensearch_url=%s", env.elastic.opensearch_url)
     return OpenSearchVectorSearch(
         index_name=es_index_name,
-        es_connection=es,
-        query_field="text",
-        strategy=BM25Strategy(),
-        opensearch_url = opensearch_url,
+        opensearch_url=env.elastic.opensearch_url,
         embedding_function=get_embeddings(env),
     )
 
@@ -93,9 +76,10 @@ def create_alias(alias: str):
 
     chunk_index_name = alias[:-8]  # removes -current
 
-    #es.options(ignore_status=[400]).indices.create(index=chunk_index_name)
-    es.indices.create(index=chunk_index_name, ignore=400)
-    es.indices.put_alias(index=chunk_index_name, name=alias)
+    # es.options(ignore_status=[400]).indices.create(index=chunk_index_name)
+    es.indices.create(index=chunk_index_name, ignore=400)  # ignore 400 error if index already exists
+    if not es.indices.exists_alias(name=alias):
+        es.indices.put_alias(index=chunk_index_name, name=alias)
 
 
 def _ingest_file(file_name: str, es_index_name: str = alias):
@@ -110,6 +94,7 @@ def _ingest_file(file_name: str, es_index_name: str = alias):
             log.info(f"Alias: {alias}, Exists: {es.indices.exists_alias(name=alias)}")
             create_alias(alias)
     else:
+        # es.options(ignore_status=[400]).indices.create(index=es_index_name)
         es.indices.create(index=es_index_name, ignore=400)
 
     # Extract metadata
@@ -142,7 +127,7 @@ def _ingest_file(file_name: str, es_index_name: str = alias):
             metadata=metadata,
         ),
         s3_client=env.s3_client(),
-        vectorstore=vectorstore_normal,
+        vectorstore=get_elasticsearch_store(es_index_name),
         env=env,
     )
 
@@ -160,7 +145,7 @@ def _ingest_file(file_name: str, es_index_name: str = alias):
             metadata=metadata,
         ),
         s3_client=env.s3_client(),
-        vectorstore=vectorstore_large,
+        vectorstore=get_elasticsearch_store_without_embeddings(es_index_name),
         env=env,
     )
 
