@@ -869,9 +869,9 @@ class ChatMessage(UUIDPrimaryKeyBase, TimeStampedModel):
             "rating_text": str(self.rating_text),
             "rating_chips": list(map(str, self.rating_chips)) if self.rating_chips else None,
         }
-        es_client.index(
+        es_client.create(
             index=env.elastic_chat_mesage_index,
-            #id=uuid.uuid4(),
+            id=uuid.uuid4(),
             body=elastic_log_msg,
         )
 
