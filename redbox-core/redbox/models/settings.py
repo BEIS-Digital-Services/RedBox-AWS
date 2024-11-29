@@ -24,8 +24,8 @@ class OpenSearchSettings(BaseModel):
     """settings required for a aws/opensearch"""
 
     model_config = SettingsConfigDict(frozen=True)
-    collection_endpoint: str
-    #collection_endpoint: str = env.str("ELASTIC__COLLECTION_ENPDOINT")
+    #collection_endpoint: str
+    collection_endpoint: str = env.str("ELASTIC__COLLECTION_ENPDOINT")
 
     @computed_field
     @property
@@ -183,7 +183,8 @@ class Settings(BaseSettings):
         logger.warning("Testing OpenSearch is definitely being used")
 
         if ENVIRONMENT.is_local:
-            auth = ("admin", "MyStrongPassword1!")
+            #auth = ("admin", "MyStrongPassword1!")
+            auth=None
             use_ssl = False
             verify_certs = False
             port = 9200
@@ -205,6 +206,8 @@ class Settings(BaseSettings):
         # Strip 'https://' from the URL
         if opensearch_url.startswith("https://"):
             opensearch_url = opensearch_url[len("https://"):]
+
+        logger.warning(f"Connecting to OpenSearch at host={opensearch_url}, port={port}")
 
         client = OpenSearch(
             hosts=[{"host": opensearch_url, "port": port}],
@@ -243,6 +246,12 @@ class Settings(BaseSettings):
             alias = f"{self.elastic_root_index}-chunk-current"
             if not client.indices.exists_alias(name=alias):
                 client.indices.put_alias(index=chunk_index, name=alias)
+
+        response = client.index(
+            index="test-index",
+            body={"field": "value"}
+        )
+        logger.warning(f"Indexing response:", response)
 
         return client
 

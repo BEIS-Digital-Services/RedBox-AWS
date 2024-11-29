@@ -11,7 +11,8 @@ from langchain_core.embeddings.embeddings import Embeddings
 from langchain_core.messages import ToolCall
 from langchain_core.tools import Tool, tool
 from langgraph.prebuilt import InjectedState
-from opensearchpy import OpenSearchfrom sklearn.metrics.pairwise import cosine_similarity
+from opensearchpy import OpenSearch
+from sklearn.metrics.pairwise import cosine_similarity
 
 from redbox.api.format import format_documents
 from redbox.chains.components import get_embeddings
