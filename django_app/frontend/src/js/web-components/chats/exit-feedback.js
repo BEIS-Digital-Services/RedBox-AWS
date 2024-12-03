@@ -223,7 +223,7 @@ class ExitFeedback extends HTMLElement {
   }
 
   async #sendFeedback() {
-    if (this.dataset.chatid === "{{ no such element: None['id'] }}") {
+    if (this.dataset.chatid === "{{ no such element: None['id'] }}" || this.dataset.chatid === "") {
       const url = window.location.href; // Get the current URL
       const match = url.match(/\/chats\/(.*)/); // Match the UUID in the URL
       const UUID = match ? match[1] : null; // Return the UUID if found, otherwise null
