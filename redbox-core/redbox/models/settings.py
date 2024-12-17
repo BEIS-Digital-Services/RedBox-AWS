@@ -199,20 +199,27 @@ class Settings(BaseSettings):
             use_ssl = True
             verify_certs = True
             port = 443
-            logger.warning("Using AWS authentication with V4 signer")
+            #logger.warning("Using AWS authentication with V4 signer")
 
         opensearch_url = env.str("OPENSEARCH_HOST")
 
         # Strip 'https://' from the URL
-        #if opensearch_url.startswith("https://"):
-        #    opensearch_url = opensearch_url[len("https://"):]
+        if opensearch_url.startswith("https://"):
+            opensearch_url = opensearch_url[len("https://"):]
+
+        credentials, host_port = opensearch_url.split("@")
+        OS_USERNAME, OS_PASSWORD = credentials.split(":")
+        OS_HOST, OS_PORT = host_port.split(":")
+        OS_PORT = int(OS_PORT)  # Convert port to integer
 
         logger.warning(f"Connecting to OpenSearch at host={opensearch_url}")
 
         client = OpenSearch(
-            hosts=[opensearch_url],
+            #hosts=[opensearch_url],
             #http_auth=auth,
-            #use_ssl=use_ssl,
+            use_ssl=use_ssl,
+            hosts=[{"host": OS_HOST, "port": OS_PORT}],
+            http_auth=(OS_USERNAME, OS_PASSWORD),  # Basic Authentication
             verify_certs=verify_certs,
             connection_class=RequestsHttpConnection,
             pool_maxsize=100,
