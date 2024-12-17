@@ -199,7 +199,7 @@ class Settings(BaseSettings):
             use_ssl = True
             verify_certs = True
             port = 443
-            #logger.warning("Using AWS authentication with V4 signer")
+            ##logger.warning("Using AWS authentication with V4 signer")
 
         opensearch_url = env.str("OPENSEARCH_HOST")
 
