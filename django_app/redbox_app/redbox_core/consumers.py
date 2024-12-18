@@ -118,7 +118,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         logger.warning(f"Selected file UUIDs: {selected_file_uuids}")
         logger.warning(f"Permitted files (IDs): {await sync_to_async(list)(permitted_files.values_list('id', flat=True))}")
-        logger.warning(f"Selected files (IDs): {[f.id for f in selected_files]}")
+        logger.warning(f"Selected files (IDs): {await sync_to_async(list)(selected_files.values_list('id', flat=True))}")
+
         await self.save_user_message(session, user_message_text, selected_files=selected_files, activities=activities)
 
         await self.llm_conversation(selected_files, session, user, user_message_text, permitted_files)
@@ -315,16 +316,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
         """
         sources_by_resource_ref: dict[str, Document] = defaultdict(list)
         for document in response:
-            logger.warning(f"Document metadata: {document.metadata}")
+            logger.warning(f"Document metadata: {await sync_to_async(lambda: document.metadata)()}")
             ref = document.metadata.get("uri")
             sources_by_resource_ref[ref].append(document)
 
-            logger.warning(f"Document metadata URI: {ref}")
+            logger.warning(f"Document metadata URI: {await sync_to_async(lambda: file.url)()}")
 
         for ref, sources in sources_by_resource_ref.items():
             try:
                 file = await File.objects.aget(original_file=ref)
-                logger.warning(f"Retrieved File: {file}")
+                logger.warning(f"Retrieved File: {await sync_to_async(lambda: {'id': file.id, 'name': file.file_name})()}")
                 payload = {"url": str(file.url), "file_name": file.file_name}
                 response_sources = [
                     Source(
