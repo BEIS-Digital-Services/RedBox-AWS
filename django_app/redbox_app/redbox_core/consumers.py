@@ -117,7 +117,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             logger.warning("No selected files after filtering permitted files.")
 
         logger.warning(f"Selected file UUIDs: {selected_file_uuids}")
-        logger.warning(f"Permitted files (IDs): {[f.id for f in permitted_files]}")
+        logger.warning(f"Permitted files (IDs): {await sync_to_async(list)(permitted_files.values_list('id', flat=True))}")
         logger.warning(f"Selected files (IDs): {[f.id for f in selected_files]}")
         await self.save_user_message(session, user_message_text, selected_files=selected_files, activities=activities)
 
