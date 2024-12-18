@@ -62,7 +62,7 @@ class ElasticLocalSettings(BaseModel):
     model_config = SettingsConfigDict(frozen=True)
 
     host: str = "elasticsearch"
-    port: int = 9200
+    port: int = 443
     scheme: str = "http"
     user: str = "elastic"
     version: str = "8.11.0"

@@ -35,7 +35,11 @@ alias = env.elastic_chunk_alias
 if ENVIRONMENT.is_local:
     opensearch_url="http://opensearch:9200"
 else:
-    opensearch_url = env_vars.str('OPENSEARCH_HOST')
+    opensearch_host = env_vars.str('OPENSEARCH_HOST')  # Ensure this includes the endpoint
+    username = env_vars.str('OPENSEARCH_USER')
+    password = env_vars.str('OPENSEARCH_PASSWORD')
+    opensearch_url = f"https://{username}:{password}@{opensearch_host}:443"
+    #opensearch_url = env_vars.str('OPENSEARCH_HOST')
 
 def clean_json_metadata(raw_metadata: str) -> str:
     """Clean and extract valid JSON from raw metadata."""
@@ -92,7 +96,11 @@ def retry_ingest(file_name, es_index_name, metadata, max_retries=3):
             log.warning("Retrying ingest, attempt %d/%d", attempt + 1, max_retries)
 
             # Rebuild the chains to ensure fresh client connections
+            log.warning("Before vectorstore_normal")
             vectorstore_normal = get_elasticsearch_store(es_index_name)
+            log.warning("After vectorstore_normal")
+
+            log.warning("Before chunk_ingest_chain")
             chunk_ingest_chain = ingest_from_loader(
                 loader=UnstructuredChunkLoader(
                     chunk_resolution=ChunkResolution.normal,
@@ -106,7 +114,13 @@ def retry_ingest(file_name, es_index_name, metadata, max_retries=3):
                 vectorstore=vectorstore_normal,
                 env=env,
             )
+            log.warning("After chunk_ingest_chain")
+            
+            log.warning("Before vectorstore_large")
             vectorstore_large = get_elasticsearch_store_without_embeddings(es_index_name)
+            log.warning("After vectorstore_large")
+
+            log.warning("Before large_chunk_ingest_chain")
             large_chunk_ingest_chain = ingest_from_loader(
                 loader=UnstructuredChunkLoader(
                     chunk_resolution=ChunkResolution.largest,
@@ -120,11 +134,14 @@ def retry_ingest(file_name, es_index_name, metadata, max_retries=3):
                 vectorstore=vectorstore_large,
                 env=env,
             )
+            log.warning("After large_chunk_ingest_chain")
 
             # Run RunnableParallel
+            log.warning("Before new_ids")
             new_ids = RunnableParallel(
                 {"normal": chunk_ingest_chain, "largest": large_chunk_ingest_chain}
             ).invoke(file_name)
+            log.warning("After new_ids")
 
             return new_ids  # Exit if successful
         except exceptions.ConnectionError as e:
