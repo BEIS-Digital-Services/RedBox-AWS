@@ -1,7 +1,7 @@
 import logging
 import os
 from functools import cache, lru_cache
-from typing import Literal, Union
+from typing import Literal, Union, Dict
 from urllib.parse import urlparse
 
 import boto3
@@ -97,12 +97,14 @@ class Settings(BaseSettings):
         name="gpt-4o", provider="azure_openai"
     )
 
-    embedding_backend: Literal[
-        "text-embedding-ada-002",
-        "amazon.titan-embed-text-v2:0",
-        "text-embedding-3-large",
-        "fake",
-    ] = "text-embedding-3-large"
+    #embedding_backend: Literal[
+    #    "text-embedding-ada-002",
+    #    "amazon.titan-embed-text-v2:0",
+    #    "text-embedding-3-large",
+    #    "fake",
+    #] = "text-embedding-3-large"
+    embedding_backend: str = "amazon.titan-embed-text-v2:0"
+    embedding_backend_vector_size: int = 1024
 
     llm_max_tokens: int = 1024
 
@@ -170,6 +172,34 @@ class Settings(BaseSettings):
         }
 
     )
+
+    #Define index mapping for Opensearch - this is important so that KNN search works
+    index_mapping : Dict = {
+    "settings": {
+    "index.knn": True
+    },
+    "mappings": {
+        "properties": {
+            "metadata": {
+                "properties": {
+                    "chunk_resolution": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+                    "created_datetime": {"type": "date"},
+                    "creator_type": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+                    "description": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+                    "index": {"type": "long"},
+                    "keywords": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+                    "name": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+                    "page_number": {"type": "long"},
+                    "token_count": {"type": "long"},
+                    "uri": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+                    "uuid": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}}
+                }
+            },
+            "text": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+            "vector_field": {"type": "knn_vector", "dimension": embedding_backend_vector_size, "method": {"name": "hnsw", "space_type": "cosinesimil", "engine": "lucene"}}     
+        }
+        }
+        }
 
     @property
     def elastic_chat_mesage_index(self):
@@ -249,9 +279,10 @@ class Settings(BaseSettings):
             chunk_index = f"{self.elastic_root_index}-chunk"
             # Ensure index creation does not raise an error if it already exists.
             try:
-                client.indices.create(
-                    index=chunk_index, ignore=400
-                )  # 400 is ignored to avoid index-already-exists errors
+                #client.indices.create(
+                #    index=chunk_index, ignore=400
+                #)  # 400 is ignored to avoid index-already-exists errors
+                client.indices.create(index=chunk_index, body=self.index_mapping, ignore=400)
             except Exception as e:
                 logger.error(f"Failed to create index {chunk_index}: {e}")
 
