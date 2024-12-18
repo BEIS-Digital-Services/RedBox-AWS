@@ -207,7 +207,7 @@ class Settings(BaseSettings):
         if opensearch_url.startswith("https://"):
             opensearch_url = opensearch_url[len("https://"):]
 
-        OS_HOST = opensearch_url
+        OS_HOST = 443
         logger.warning(f"OpenSearch is={OS_HOST}")
         #credentials, host_port = opensearch_url.split("@")
         #OS_USERNAME, OS_PASSWORD = credentials.split(":")
