@@ -16,6 +16,7 @@ from langchain_core.exceptions import OutputParserException
 import json
 import re
 from opensearchpy import exceptions
+from langchain_core.embeddings import FakeEmbeddings
 
 
 if TYPE_CHECKING:
@@ -72,7 +73,8 @@ def get_elasticsearch_store_without_embeddings(es_index_name: str):
     return OpenSearchVectorSearch(
         index_name=es_index_name,
         opensearch_url=opensearch_url,
-        embedding_function=get_embeddings(env),
+        #embedding_function=get_embeddings(env),
+        embedding_function=FakeEmbeddings(size=env.embedding_backend_vector_size),
     )
 
 
@@ -83,7 +85,8 @@ def create_alias(alias: str):
     chunk_index_name = alias[:-8]  # removes -current
 
     # es.options(ignore_status=[400]).indices.create(index=chunk_index_name)
-    es.indices.create(index=chunk_index_name, ignore=400)  # ignore 400 error if index already exists
+    #es.indices.create(index=chunk_index_name, ignore=400)  # ignore 400 error if index already exists
+    es.indices.create(index=chunk_index_name, body=env.index_mapping, ignore=400)
     if not es.indices.exists_alias(name=alias):
         es.indices.put_alias(index=chunk_index_name, name=alias)
 
@@ -164,7 +167,8 @@ def _ingest_file(file_name: str, es_index_name: str = alias):
             log.warning(f"Alias: {alias}, Exists: {es.indices.exists_alias(name=alias)}")
             create_alias(alias)
     else:
-        es.indices.create(index=es_index_name, ignore=400)
+        #es.indices.create(index=es_index_name, ignore=400)
+        es.indices.create(index=es_index_name, body=env.index_mapping, ignore=400)
 
     # Extract metadata
     metadata_loader = MetadataLoader(env=env, s3_client=env.s3_client(), file_name=file_name)
