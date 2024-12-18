@@ -207,10 +207,15 @@ class Settings(BaseSettings):
         if opensearch_url.startswith("https://"):
             opensearch_url = opensearch_url[len("https://"):]
 
-        credentials, host_port = opensearch_url.split("@")
-        OS_USERNAME, OS_PASSWORD = credentials.split(":")
-        OS_HOST, OS_PORT = host_port.split(":")
-        OS_PORT = int(OS_PORT)  # Convert port to integer
+        OS_HOST = opensearch_url
+        logger.warning(f"OpenSearch is={OS_HOST}")
+        #credentials, host_port = opensearch_url.split("@")
+        #OS_USERNAME, OS_PASSWORD = credentials.split(":")
+        #OS_HOST, OS_PORT = host_port.split(":")
+        #OS_PORT = int(OS_PORT)  # Convert port to integer
+        OS_PORT = port
+        OS_USERNAME = env.str("OPENSEARCH_USER")
+        OS_PASSWORD = env.str("OPENSEARCH_PASSWORD")
 
         logger.warning(f"Connecting to OpenSearch at host={opensearch_url}")
 
