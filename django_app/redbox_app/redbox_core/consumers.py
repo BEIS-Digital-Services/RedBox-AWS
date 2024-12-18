@@ -73,7 +73,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def receive(self, text_data=None, bytes_data=None):
         """Receive & respond to message from browser websocket."""
-        logger.warning(f"WebSocket received data: {data}")
         self.full_reply = []
         self.citations = []
         self.external_citations = []
@@ -81,6 +80,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         self.activities = []
 
         data = json.loads(text_data or bytes_data)
+        logger.warning(f"WebSocket received data: {data}")
         logger.debug("received %s from browser", data)
         user_message_text: str = data.get("message", "")
         selected_file_uuids: Sequence[UUID] = [UUID(u) for u in data.get("selectedFiles", [])]
