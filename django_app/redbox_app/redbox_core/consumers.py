@@ -5,6 +5,7 @@ from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from typing import Any, ClassVar
 from uuid import UUID
+from asgiref.sync import sync_to_async
 
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
@@ -111,8 +112,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
         permitted_files = File.objects.filter(user=user, status=File.Status.complete)
         selected_files = permitted_files.filter(id__in=selected_file_uuids)
 
-        # Log if no selected files exist
-        if not selected_files:
+        # Check if no files were selected
+        if not await sync_to_async(selected_files.exists)():
             logger.warning("No selected files after filtering permitted files.")
 
         logger.warning(f"Selected file UUIDs: {selected_file_uuids}")
