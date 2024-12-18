@@ -733,12 +733,22 @@ class Chat(UUIDPrimaryKeyBase, TimeStampedModel, AbstractAISettings):
         )
 
     @property
-    def newest_message_date(self) -> date:
-        return self.chatmessage_set.aggregate(newest_date=Max("created_at"))["newest_date"].date()
+    def newest_message_date(self) -> date | None:
+        newest_date = self.chatmessage_set.aggregate(newest_date=Max("created_at"))["newest_date"]
+        if newest_date is None:
+            logger.warning(f"Chat {self.id} has no messages; returning None for newest_message_date.")
+            return None
+        return newest_date.date()
+
 
     @property
     def date_group(self):
-        return get_date_group(self.newest_message_date)
+        newest_date = self.newest_message_date
+        if newest_date is None:
+            logger.warning(f"Chat {self.id} has no newest_message_date; returning default date group.")
+            return None  # Or return a default value as appropriate
+        return get_date_group(newest_date)
+
 
 
 class Citation(UUIDPrimaryKeyBase, TimeStampedModel):
