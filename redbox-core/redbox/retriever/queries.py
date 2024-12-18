@@ -51,6 +51,7 @@ def build_query_filter(
     if chunk_resolution:
         query_filter.append(build_resolution_filter(chunk_resolution=chunk_resolution))
 
+    log.warning(f"Final query filter: {query_filter}")
     return query_filter
 
 
