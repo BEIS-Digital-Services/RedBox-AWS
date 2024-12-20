@@ -100,8 +100,8 @@ def build_merge_pattern(
             default_document = Document(
                 page_content="No documents provided.",
                 metadata={
-                    "uuid": "8e1c5616-140f-455b-90ae-cd9855658561",
-                    "token_count": 1357
+                    "uuid": "5ed5d303-6c40-4f1a-9c26-503cd8acb61c",
+                    "token_count": 1024
                 }
             )
 
