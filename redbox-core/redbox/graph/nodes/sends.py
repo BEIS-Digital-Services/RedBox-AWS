@@ -1,14 +1,13 @@
 from typing import Callable
 
-from langchain_core.messages import AIMessage
 from langgraph.constants import Send
 
-from redbox.models.chain import DocumentState, RedboxState
+from redbox.models.chain import RedboxState
 
 
 def _copy_state(state: RedboxState, **updates) -> RedboxState:
-    updated_model = state.model_copy(update=updates, deep=True)
-    return updated_model
+    kwargs = dict(state) | updates
+    return RedboxState(**kwargs)
 
 
 def build_document_group_send(target: str) -> Callable[[RedboxState], list[Send]]:
@@ -18,9 +17,9 @@ def build_document_group_send(target: str) -> Callable[[RedboxState], list[Send]
         group_send_states: list[RedboxState] = [
             _copy_state(
                 state,
-                documents=DocumentState(groups={document_group_key: document_group}),
+                documents={document_group_key: document_group},
             )
-            for document_group_key, document_group in state.documents.groups.items()
+            for document_group_key, document_group in state["documents"].items()
         ]
         return [Send(node=target, arg=state) for state in group_send_states]
 
@@ -34,9 +33,9 @@ def build_document_chunk_send(target: str) -> Callable[[RedboxState], list[Send]
         chunk_send_states: list[RedboxState] = [
             _copy_state(
                 state,
-                documents=DocumentState(groups={document_group_key: {document_key: document}}),
+                documents={document_group_key: {document_key: document}},
             )
-            for document_group_key, document_group in state.documents.groups.items()
+            for document_group_key, document_group in state["documents"].items()
             for document_key, document in document_group.items()
         ]
         return [Send(node=target, arg=state) for state in chunk_send_states]
@@ -51,9 +50,9 @@ def build_tool_send(target: str) -> Callable[[RedboxState], list[Send]]:
         tool_send_states: list[RedboxState] = [
             _copy_state(
                 state,
-                messages=[AIMessage(content=state.last_message.content, tool_calls=[tool_call])],
+                tool_calls={tool_id: tool_call},
             )
-            for tool_call in state.last_message.tool_calls
+            for tool_id, tool_call in state["tool_calls"].items()
         ]
         return [Send(node=target, arg=state) for state in tool_send_states]
 

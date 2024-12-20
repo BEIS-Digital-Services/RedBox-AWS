@@ -8,7 +8,6 @@ logger = logging.getLogger(__name__)
 
 env = get_settings()
 
-logger.warning("inside delete_es_indeces.py")
 es_client = env.elasticsearch_client()
 
 

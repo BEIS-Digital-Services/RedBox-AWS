@@ -15,6 +15,7 @@ class SignUpForm(forms.ModelForm):
     class Meta:
         model = User
         fields = (
+            "email",
             "business_unit",
             "role",
             "grade",
@@ -62,6 +63,7 @@ class SignUpForm(forms.ModelForm):
             "consent_agreement",
         )
         labels: ClassVar[Mapping[str, str]] = {
+            "email": "Email address (required)",
             "business_unit": "What Business Unit are you part of",
             "role": "What's your role?",
             "grade": "What Grade (or equivalent) are you?",
@@ -109,6 +111,7 @@ class SignUpForm(forms.ModelForm):
             "consent_agreement": "I give my informed, voluntary consent to take part in this research as per my selections above (required)",  # noqa: E501
         }
         widgets: ClassVar[Mapping[str, forms.Widget]] = {
+            "email": forms.EmailInput(attrs={"class": "govuk-input govuk-!-width-one-half"}),
             "business_unit": forms.Select(attrs={"class": "govuk-select"}),
             "role": forms.TextInput(attrs={"class": "govuk-input govuk-!-width-one-half"}),
             "grade": forms.Select(attrs={"class": "govuk-select"}),

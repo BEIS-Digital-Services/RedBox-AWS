@@ -1,24 +1,12 @@
 // @ts-check
 
-export class FeedbackButtons extends HTMLElement {
-  connectedCallback() {
-    this.collectedData = {
+class FeedbackButtons extends HTMLElement {
+  showFeedback(messageId) {
+    let collectedData = {
       rating: 0,
       text: "",
       chips: /** @type {string[]}*/ ([]),
     };
-
-    // If the messageID already exists (e.g. for SSR messages), render the feedback HTML immediately
-    if (this.dataset.id) {
-      this.showFeedback(this.dataset.id);
-    }
-  }
-
-  /**
-   * @param {string} messageId
-   */
-  showFeedback(messageId) {
-    this.dataset.id = messageId;
 
     const starIcon = `
         <svg width="25" height="25" viewBox="0 0 25 25" fill="none" focusable="false" aria-hidden="true">
@@ -95,18 +83,63 @@ export class FeedbackButtons extends HTMLElement {
         </div>
     `;
 
+    /**
+     * Posts data back to the server
+     */
+    const sendFeedback = async (retry = 0) => {
+      const MAX_RETRIES = 10;
+      const RETRY_INTERVAL_SECONDS = 10;
+      const csrfToken =
+        /** @type {HTMLInputElement | null} */ (
+          document.querySelector('[name="csrfmiddlewaretoken"]')
+        )?.value || "";
+      try {
+        await fetch(`/ratings/${messageId}/`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrfToken,
+          },
+          body: JSON.stringify(collectedData),
+        });
+      } catch (err) {
+        if (retry < MAX_RETRIES) {
+          window.setTimeout(() => {
+            sendFeedback(retry + 1);
+          }, RETRY_INTERVAL_SECONDS * 1000);
+        }
+      }
+    };
+
+    /**
+     * @param {number} panelIndex - zero based
+     */
+    const showPanel = (panelIndex) => {
+      /** @type {NodeListOf<HTMLElement>} */
+      let panels = this.querySelectorAll(".feedback__container");
+      panels.forEach((panel) => {
+        panel.setAttribute("hidden", "");
+      });
+      panels[panelIndex].removeAttribute("hidden");
+      panels[panelIndex].focus();
+      if (collectedData.rating >= 3) {
+        panels[panelIndex].classList.remove("feedback__container--negative");
+        panels[panelIndex].classList.add("feedback__container--positive");
+      } else {
+        panels[panelIndex].classList.add("feedback__container--negative");
+        panels[panelIndex].classList.remove("feedback__container--positive");
+      }
+    };
+
     /* Panel 1 - stars rating */
     let starButtons = /** @type {NodeListOf<HTMLElement>} */ (
       this.querySelectorAll(".feedback__star-button")
     );
     starButtons.forEach((starButton, buttonIndex) => {
       starButton.addEventListener("click", () => {
-        if (!this.collectedData) {
-          return;
-        }
-        this.collectedData.rating = parseInt(starButton.dataset.rating || "0");
-        this.#sendFeedback();
-        this.#showPanel(1);
+        collectedData.rating = parseInt(starButton.dataset.rating || "0");
+        sendFeedback();
+        showPanel(1);
       });
       starButton.addEventListener("mouseover", () => {
         starButtons.forEach((btn) => {
@@ -127,7 +160,7 @@ export class FeedbackButtons extends HTMLElement {
     this.querySelector(".feedback__improve-response-btn")?.addEventListener(
       "click",
       () => {
-        this.#showPanel(2);
+        showPanel(2);
       }
     );
 
@@ -138,22 +171,19 @@ export class FeedbackButtons extends HTMLElement {
       "click",
       (evt) => {
         evt.preventDefault();
-        if (!this.collectedData) {
-          return;
-        }
         /** @type {NodeListOf<HTMLInputElement>} */
         let chips = this.querySelectorAll(".feedback__chip");
         chips.forEach((chip) => {
           if (chip.checked) {
             const text = this.querySelector(`[for="${chip.id}"]`)?.textContent;
-            if (text && this.collectedData) {
-              this.collectedData.chips.push(text);
+            if (text) {
+              collectedData.chips.push(text);
             }
           }
         });
-        this.collectedData.text = textInput?.value || "";
-        this.#sendFeedback();
-        this.#showPanel(3);
+        collectedData.text = textInput?.value || "";
+        sendFeedback();
+        showPanel(3);
       }
     );
     textInput?.addEventListener("input", () => {
@@ -165,59 +195,15 @@ export class FeedbackButtons extends HTMLElement {
     this.querySelector(".feedback__rate-again-btn")?.addEventListener(
       "click",
       () => {
-        this.#showPanel(0);
+        showPanel(0);
       }
     );
   }
 
-  /**
-   * Posts data back to the server
-   */
-  async #sendFeedback(retry = 0) {
-    const MAX_RETRIES = 10;
-    const RETRY_INTERVAL_SECONDS = 10;
-    const csrfToken =
-      /** @type {HTMLInputElement | null} */ (
-        document.querySelector('[name="csrfmiddlewaretoken"]')
-      )?.value || "";
-    try {
-      await fetch(`/ratings/${this.dataset.id}/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRFToken": csrfToken,
-        },
-        body: JSON.stringify(this.collectedData),
-      });
-    } catch (err) {
-      if (retry < MAX_RETRIES) {
-        window.setTimeout(() => {
-          this.#sendFeedback(retry + 1);
-        }, RETRY_INTERVAL_SECONDS * 1000);
-      }
-    }
-  }
-
-  /**
-   * @param {number} panelIndex - zero based
-   */
-  #showPanel(panelIndex) {
-    if (!this.collectedData) {
-      return;
-    }
-    /** @type {NodeListOf<HTMLElement>} */
-    let panels = this.querySelectorAll(".feedback__container");
-    panels.forEach((panel) => {
-      panel.setAttribute("hidden", "");
-    });
-    panels[panelIndex].removeAttribute("hidden");
-    panels[panelIndex].focus();
-    if (this.collectedData.rating >= 3) {
-      panels[panelIndex].classList.remove("feedback__container--negative");
-      panels[panelIndex].classList.add("feedback__container--positive");
-    } else {
-      panels[panelIndex].classList.add("feedback__container--negative");
-      panels[panelIndex].classList.remove("feedback__container--positive");
+  // If the messageID already exists (e.g. for SSR messages), render the feedback HTML immediately
+  connectedCallback() {
+    if (this.dataset.id) {
+      this.showFeedback(this.dataset.id);
     }
   }
 }

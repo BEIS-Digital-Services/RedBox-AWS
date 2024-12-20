@@ -12,10 +12,9 @@ class ChatController extends HTMLElement {
 
     messageForm?.addEventListener("submit", (evt) => {
       evt.preventDefault();
-      const messageInput =
-        /** @type {import("./message-input").MessageInput} */ (
-          document.querySelector("message-input")
-        );
+      const messageInput = /** @type {MessageInput | null} */ (
+        document.querySelector("message-input")
+      );
       const userText = messageInput?.getValue();
       if (!messageInput || !userText) {
         return;
@@ -28,14 +27,10 @@ class ChatController extends HTMLElement {
       userMessage.setAttribute("data-role", "user");
       messageContainer?.insertBefore(userMessage, insertPosition);
 
-      let activites = [];
-      if (selectedDocuments.length) {
-        activites.push(`You selected ${selectedDocuments.length} document${
-          selectedDocuments.length === 1 ? "" : "s"
-        }`);
-      }
-      activites.push("You sent this prompt");
-
+      const activites = [
+        `You selected ${selectedDocuments.length || "no"} document${selectedDocuments.length === 1 ? "" : "s"}`,
+        "You sent this prompt"
+      ];
       // add filename to activity if only one file
       if (selectedDocuments.length === 1) {
         activites[0] += ` (${selectedDocuments[0].name})`;
@@ -50,10 +45,9 @@ class ChatController extends HTMLElement {
       aiMessage.setAttribute("data-role", "ai");
       messageContainer?.insertBefore(aiMessage, insertPosition);
 
-      const llm =
-        /** @type {HTMLInputElement | null}*/ (
-          document.querySelector("#llm-selector")
-        )?.value || "";
+      const llm = /** @type {HTMLInputElement | null}*/ (
+        document.querySelector("#llm-selector")
+      )?.value || "";
 
       aiMessage.stream(
         userText,

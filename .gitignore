@@ -2,10 +2,6 @@
 .idea/
 redbox-core/models/
 
-# AI Test Data
-
-ai-tests/data/
-
 # data files
 elk/elasticsearch/data
 data/
@@ -18,6 +14,7 @@ db/
 
 node_modules/
 package-lock.json
+package.json
 yarn.lock
 
 # Byte-compiled / optimized / DLL files
@@ -38,6 +35,7 @@ dist/
 downloads/
 eggs/
 .eggs/
+lib/
 lib64/
 parts/
 sdist/

@@ -223,17 +223,6 @@ class ExitFeedback extends HTMLElement {
   }
 
   async #sendFeedback() {
-    if (this.dataset.chatid === "{{ no such element: None['id'] }}" || this.dataset.chatid === "") {
-      const url = window.location.href; // Get the current URL
-      const match = url.match(/\/chats\/(.*)/); // Match the UUID in the URL
-      const UUID = match ? match[1] : null; // Return the UUID if found, otherwise null
-      if (UUID) {
-        this.dataset.chatid = UUID; // Set the UUID as the dataset property
-      } else {
-        console.warn("No UUID found in the URL."); // Log a warning if no UUID is found
-      }
-    }
-    console.log("This is the chat id " + this.dataset.chatid);
     try {
       await fetch(`/chats/${this.dataset.chatid}/update-chat-feedback`, {
         method: "POST",

@@ -10,26 +10,17 @@ from langchain_core.embeddings import Embeddings, FakeEmbeddings
 from langchain_core.tools import StructuredTool
 from langchain_core.runnables import Runnable
 from langchain_core.utils import convert_to_secret_str
+from langchain_elasticsearch import ElasticsearchRetriever
 from langchain_openai.embeddings import AzureOpenAIEmbeddings, OpenAIEmbeddings
 
 
 from redbox.chains.parser import StreamingJsonOutputParser
-from redbox.models.settings import (
-    ChatLLMBackend,
-    Settings,
-    ElasticCloudSettings,
-    OpenSearchSettings,
-    ElasticLocalSettings,
-)
-from redbox.retriever import (
-    AllElasticsearchRetriever,
-    ParameterisedElasticsearchRetriever,
-    MetadataRetriever,
-)
+from redbox.models.settings import ChatLLMBackend, Settings
+from redbox.retriever import AllElasticsearchRetriever, ParameterisedElasticsearchRetriever, OpenSearchRetriever, MetadataRetriever
 from langchain_community.embeddings import BedrockEmbeddings
 from langchain.chat_models import init_chat_model
 from redbox.models.chain import StructuredResponseWithCitations
-from redbox.retriever.retrievers import AllOpensearchRetriever, OpensearchMetadataRetriever
+
 
 logger = logging.getLogger(__name__)
 load_dotenv()
@@ -85,22 +76,20 @@ def get_embeddings(env: Settings) -> Embeddings:
     if env.embedding_backend == "text-embedding-ada-002":
         return get_openai_embeddings(env)
     if env.embedding_backend == "fake":
-        return FakeEmbeddings(size=1024)
+        return FakeEmbeddings(size=3072)
     if env.embedding_backend == "amazon.titan-embed-text-v2:0":
         return get_aws_embeddings(env)
     raise Exception("No configured embedding model")
 
 
-def get_all_chunks_retriever(env: Settings) -> AllOpensearchRetriever:
-    return AllOpensearchRetriever(
+def get_all_chunks_retriever(env: Settings) -> OpenSearchRetriever:
+    return AllElasticsearchRetriever(
         es_client=env.elasticsearch_client(),
         index_name=env.elastic_chunk_alias,
     )
-    
 
 
 def get_parameterised_retriever(env: Settings, embeddings: Embeddings | None = None):
-    logger.warning("inside components.py inside get_parameterised_retriever")
     """Creates an Elasticsearch retriever runnable.
 
     Runnable takes input of a dict keyed to question, file_uuids and user_uuid.
@@ -115,12 +104,11 @@ def get_parameterised_retriever(env: Settings, embeddings: Embeddings | None = N
     )
 
 
-def get_metadata_retriever(env: Settings) -> OpensearchMetadataRetriever:
-    return OpensearchMetadataRetriever(
+def get_metadata_retriever(env: Settings):
+    return MetadataRetriever(
         es_client=env.elasticsearch_client(),
         index_name=env.elastic_chunk_alias,
     )
-
 
 
 def get_structured_response_with_citations_parser() -> tuple[Runnable, str]:

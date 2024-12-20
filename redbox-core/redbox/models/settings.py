@@ -1,18 +1,17 @@
 import logging
 import os
 from functools import cache, lru_cache
-from typing import Literal, Union, Dict
-from urllib.parse import urlparse
+from typing import Literal, Union
 
 import boto3
 import environ
 from elasticsearch import Elasticsearch
-from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth
-from pydantic import BaseModel, computed_field
+from openai import max_retries
+from opensearchpy import AWSV4SignerAuth, OpenSearch, RequestsHttpConnection
+from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from redbox_app.setting_enums import Environment
 from langchain.globals import set_debug
-
 
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
 logger = logging.getLogger()
@@ -24,36 +23,8 @@ class OpenSearchSettings(BaseModel):
     """settings required for a aws/opensearch"""
 
     model_config = SettingsConfigDict(frozen=True)
-    #collection_endpoint: str
-    collection_endpoint: str = env.str("OPENSEARCH_HOST")
 
-    @computed_field
-    @property
-    def user(self) -> str:
-        return urlparse(self.collection_endpoint).username
-
-    @computed_field
-    @property
-    def password(self) -> str:
-        return urlparse(self.collection_endpoint).password
-
-    @computed_field
-    @property
-    def host(self) -> str:
-        return urlparse(self.collection_endpoint).hostname
-
-    @computed_field
-    @property
-    def port(self) -> int:
-        return urlparse(self.collection_endpoint).port
-
-    @computed_field
-    @property
-    def opensearch_url(self) -> str:
-        url = urlparse(self.collection_endpoint)
-        if url.port is not None:
-            return f"{self.host}:{self.port}"
-        return self.host
+    collection_endpoint: str = env.str("ELASTIC__COLLECTION_ENPDOINT")
 
 
 class ElasticLocalSettings(BaseModel):
@@ -97,14 +68,12 @@ class Settings(BaseSettings):
         name="gpt-4o", provider="azure_openai"
     )
 
-    #embedding_backend: Literal[
-    #    "text-embedding-ada-002",
-    #    "amazon.titan-embed-text-v2:0",
-    #    "text-embedding-3-large",
-    #    "fake",
-    #] = "text-embedding-3-large"
-    embedding_backend: str = "amazon.titan-embed-text-v2:0"
-    embedding_backend_vector_size: int = 1024
+    embedding_backend: Literal[
+        "text-embedding-ada-002",
+        "amazon.titan-embed-text-v2:0",
+        "text-embedding-3-large",
+        "fake",
+    ] = "text-embedding-3-large"
 
     llm_max_tokens: int = 1024
 
@@ -131,7 +100,7 @@ class Settings(BaseSettings):
     beats_system_password: str = "redboxpass"
 
     minio_host: str = "minio"
-    minio_port: int = 9025
+    minio_port: int = 9000
     aws_access_key: str | None = None
     aws_secret_key: str | None = None
 
@@ -171,35 +140,7 @@ class Settings(BaseSettings):
             "You are an SEI specialist that must optimise the metadata of a document to make it as discoverable as possible. You are about to be given the first 1,000 tokens of a document and any hard-coded file metadata that can be recovered from it. Create SEI-optimised metadata for this document. Description must be less than 100 words and no more than 5 keywords. Respond strictly in valid JSON format. Do not include any additional text or commentary. Provide only the requested metadata as a JSON object."
         }
 
-    )
-
-    #Define index mapping for Opensearch - this is important so that KNN search works
-    index_mapping : Dict = {
-    "settings": {
-    "index.knn": True
-    },
-    "mappings": {
-        "properties": {
-            "metadata": {
-                "properties": {
-                    "chunk_resolution": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
-                    "created_datetime": {"type": "date"},
-                    "creator_type": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
-                    "description": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
-                    "index": {"type": "long"},
-                    "keywords": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
-                    "name": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
-                    "page_number": {"type": "long"},
-                    "token_count": {"type": "long"},
-                    "uri": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
-                    "uuid": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}}
-                }
-            },
-            "text": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
-            "vector_field": {"type": "knn_vector", "dimension": embedding_backend_vector_size, "method": {"name": "hnsw", "space_type": "cosinesimil", "engine": "lucene"}}     
-        }
-        }
-        }
+    ) 
 
     @property
     def elastic_chat_mesage_index(self):
@@ -209,24 +150,19 @@ class Settings(BaseSettings):
     def elastic_alias(self):
         return self.elastic_root_index + "-chunk-current"
 
+    @lru_cache(1)
     def elasticsearch_client(self) -> Union[Elasticsearch, OpenSearch]:
-        logger.warning("Testing OpenSearch is definitely being used")
-
+        logger.info("Testing OpenSearch is definitely being used")
         if ENVIRONMENT.is_local:
-            #auth = ("admin", "MyStrongPassword1!")
-            auth=None
+            auth = ("admin", "MyStrongPassword1!")
             use_ssl = False
             verify_certs = False
             port = 9200
-            logger.warning("Using local environment with basic auth")
         else:
-           #credentials = boto3.Session().get_credentials()
-           #credentials = credentials.get_frozen_credentials()
-           #auth = AWSV4SignerAuth(credentials, "eu-west-2")
+            
             use_ssl = True
             verify_certs = True
             port = 443
-            logger.warning("Using AWS authentication with V4 signer")
         if opensearch_url.startswith("https://"):
             opensearch_url = opensearch_url[len("https://"):]
  
@@ -239,51 +175,40 @@ class Settings(BaseSettings):
             hosts=[{"host": OS_HOST, "port": OS_PORT}],
             http_auth=(OS_USERNAME, OS_PASSWORD),  # Basic Authentication
             use_ssl=use_ssl,
-            hosts=[{"host": OS_HOST, "port": OS_PORT}],
-            http_auth=(OS_USERNAME, OS_PASSWORD),  # Basic Authentication
             verify_certs=verify_certs,
             connection_class=RequestsHttpConnection,
             pool_maxsize=100,
-            timeout=120,
+            timeout=30,
             max_retries=3,
             retry_on_timeout=True,
         )
 
-        # Fetch and list all indices in the OpenSearch cluster
-        try:
-            indices = client.cat.indices(format="json")
-            print("Indices in the cluster:")
-            for index in indices:
-                 logger.warning(f"- {index['index']}")
-        except Exception as e:
-            logger.warning(f"Error fetching indices: {e}")
+        logger.info(f"Client hosts: {client.transport.hosts}")
+        logger.info(f"Client connection class: {client.transport.connection_class}")
 
-        logger.warning(f"Client hosts: {client.transport.hosts}")
-        logger.warning(f"Client connection class: {client.transport.connection_class}")
-
-        if not client.indices.exists_alias(name=self.elastic_alias):
+        if not client.indices.exists_alias(
+            name=f"{self.elastic_root_index}-chunk-current"
+        ):
             chunk_index = f"{self.elastic_root_index}-chunk"
+
             # Ensure index creation does not raise an error if it already exists.
             try:
-                #client.indices.create(
-                #    index=chunk_index, ignore=400
-                #)  # 400 is ignored to avoid index-already-exists errors
-                client.indices.create(index=chunk_index, body=self.index_mapping, ignore=400)
+                client.indices.create(
+                    index=chunk_index, ignore=400
+                )  # 400 is ignored to avoid index-already-exists errors
             except Exception as e:
                 logger.error(f"Failed to create index {chunk_index}: {e}")
 
-            alias = f"{self.elastic_root_index}-chunk-current"
-            if not client.indices.exists_alias(name=alias):
-                client.indices.put_alias(index=chunk_index, name=alias)
-
-        response = client.index(
-            index="test-index",
-            body={"field": "value"}
-        )
-        logger.warning(f"Indexing response:", response)
+            try:
+                client.indices.put_alias(
+                    index=chunk_index, name=f"{self.elastic_root_index}-chunk-current"
+                )
+            except Exception as e:
+                logger.error(
+                    f"Failed to set alias {self.elastic_root_index}-chunk-current: {e}"
+                )
 
         return client
-
 
     def s3_client(self):
         if self.object_store == "minio":

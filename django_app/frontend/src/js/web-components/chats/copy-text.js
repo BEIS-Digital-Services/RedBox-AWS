@@ -12,29 +12,23 @@ class CopyText extends HTMLElement {
         </button>
     `;
 
+    const copyToClip = (html, text) => {
+      function listener(evt) {
+        evt.clipboardData.setData("text/html", html);
+        evt.clipboardData.setData("text/plain", text);
+        evt.preventDefault();
+      }
+      document.addEventListener("copy", listener);
+      document.execCommand("copy");
+      document.removeEventListener("copy", listener);
+    };
+
     this.querySelector("button")?.addEventListener("click", () => {
-      const textEl = /** @type {HTMLElement} */ (
-        this.closest(".iai-chat-bubble")?.querySelector(
-          ".iai-chat-bubble__text"
-        )
+      const textEl = this.closest(".iai-chat-bubble")?.querySelector(
+        ".iai-chat-bubble__text"
       );
-      this.#copyToClipboard(textEl?.innerHTML, textEl?.innerText);
+      copyToClip(textEl?.innerHTML, textEl?.innerText);
     });
   }
-
-  /**
-   * @param {string} html
-   * @param {string} text
-   */
-  #copyToClipboard = (html, text) => {
-    const listener = (evt) => {
-      evt.clipboardData.setData("text/html", html);
-      evt.clipboardData.setData("text/plain", text);
-      evt.preventDefault();
-    };
-    document.addEventListener("copy", listener);
-    document.execCommand("copy");
-    document.removeEventListener("copy", listener);
-  };
 }
 customElements.define("copy-text", CopyText);

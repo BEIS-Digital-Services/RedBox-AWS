@@ -5,7 +5,6 @@ from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from typing import Any, ClassVar
 from uuid import UUID
-from asgiref.sync import sync_to_async
 
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
@@ -81,7 +80,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
         self.activities = []
 
         data = json.loads(text_data or bytes_data)
-        logger.warning(f"WebSocket received data: {data}")
         logger.debug("received %s from browser", data)
         user_message_text: str = data.get("message", "")
         selected_file_uuids: Sequence[UUID] = [UUID(u) for u in data.get("selectedFiles", [])]
@@ -111,15 +109,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
         # save user message
         permitted_files = File.objects.filter(user=user, status=File.Status.complete)
         selected_files = permitted_files.filter(id__in=selected_file_uuids)
-
-        # Check if no files were selected
-        if not await sync_to_async(selected_files.exists)():
-            logger.warning("No selected files after filtering permitted files.")
-
-        logger.warning(f"Selected file UUIDs: {selected_file_uuids}")
-        logger.warning(f"Permitted files (IDs): {await sync_to_async(list)(permitted_files.values_list('id', flat=True))}")
-        logger.warning(f"Selected files (IDs): {await sync_to_async(list)(selected_files.values_list('id', flat=True))}")
-
         await self.save_user_message(session, user_message_text, selected_files=selected_files, activities=activities)
 
         await self.llm_conversation(selected_files, session, user, user_message_text, permitted_files)
@@ -152,16 +141,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             ),
         )
 
-        # Log if no S3 keys exist
-        if not state.request.s3_keys:
-            logger.warning("No S3 keys constructed for query.")
-
-        logger.warning(f"Selected S3 keys: {state.request.s3_keys}")
-        logger.warning(f"Permitted S3 keys: {state.request.permitted_s3_keys}")
-        logger.warning(f"Constructed RedboxState: {state}")
-
         try:
-            logger.warning(f"Calling Redbox with state: {state}")
             await self.redbox.run(
                 state,
                 response_tokens_callback=self.handle_text,
@@ -258,7 +238,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                         url=citation_source.source,
                         text=citation_source.highlighted_text_in_source,
                         page_numbers=citation_source.page_numbers,
-                        source=Citation.Origin.try_parse(citation_source.source_type),
+                        source=Citation.Origin(citation_source.source_type),
                     )
 
         if self.metadata:
@@ -292,7 +272,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         ai_settings["chat_backend"] = model_to_dict(chat.chat_backend)
 
         # we remove null values so that AISettings can populate them with defaults
-        ai_settings = {k: v for k, v in ai_settings.items() if v not in (None, "")}
+        ai_settings = {k: v for k, v in ai_settings.items() if v is not None}
         return AISettings.model_validate(ai_settings)
 
     async def handle_text(self, response: str) -> str:
@@ -316,16 +296,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
         """
         sources_by_resource_ref: dict[str, Document] = defaultdict(list)
         for document in response:
-            logger.warning(f"Document metadata: {await sync_to_async(lambda: document.metadata)()}")
             ref = document.metadata.get("uri")
             sources_by_resource_ref[ref].append(document)
-
-            logger.warning(f"Document metadata URI: {await sync_to_async(lambda: file.url)()}")
 
         for ref, sources in sources_by_resource_ref.items():
             try:
                 file = await File.objects.aget(original_file=ref)
-                logger.warning(f"Retrieved File: {await sync_to_async(lambda: {'id': file.id, 'name': file.file_name})()}")
                 payload = {"url": str(file.url), "file_name": file.file_name}
                 response_sources = [
                     Source(
@@ -338,7 +314,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     for cited_chunk in sources
                 ]
             except File.DoesNotExist:
-                logger.warning(f"File with URI '{ref}' does not exist in the database.")
                 file = None
                 payload = {"url": ref, "file_name": None}
                 response_sources = [

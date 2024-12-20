@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 env = get_settings()
 
-logger.warning("inside reingest_files.py")
 es_client = env.elasticsearch_client()
 
 
