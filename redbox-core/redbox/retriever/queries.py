@@ -11,14 +11,15 @@ log = logging.getLogger()
 
 def build_file_filter(file_names: list[str]) -> dict[str, Any]:
     """Creates an Elasticsearch filter for file names."""
-    return {
-        "bool": {
-            "should": [
-                {"terms": {"metadata.file_name.keyword": file_names}},
-                {"terms": {"metadata.uri.keyword": file_names}},
-            ]
-        }
-    }
+    return {"terms": {"metadata.uri.keyword": file_names}}
+#    return {
+#        "bool": {
+#            "should": [
+#                {"terms": {"metadata.file_name.keyword": file_names}},
+#                {"terms": {"metadata.uri.keyword": file_names}},
+#            ]
+#        }
+#    }
 
 
 def build_resolution_filter(chunk_resolution: ChunkResolution) -> dict[str, Any]:
@@ -29,6 +30,9 @@ def build_resolution_filter(chunk_resolution: ChunkResolution) -> dict[str, Any]
 def build_query_filter(
     selected_files: list[str], permitted_files: list[str], chunk_resolution: ChunkResolution | None
 ) -> list[dict[str, Any]]:
+    log.warning(f"inside build_query_filter")
+    log.warning(f"Selected files: {selected_files}")
+    log.warning(f"Permitted files: {permitted_files}")
     """Generic filter constructor for all queries.
 
     Warns if the selected S3 keys aren't in the permitted S3 keys.
@@ -43,13 +47,20 @@ def build_query_filter(
         )
 
     file_names = list(selected_files & permitted_files)
+    log.warning(f"Intersecting file names: {file_names}")
 
-    query_filter = []
+    #query_filter = []
+    list_filters = []
 
-    query_filter.append(build_file_filter(file_names=file_names))
+    #query_filter.append(build_file_filter(file_names=file_names))
+    list_filters.append(build_file_filter(file_names=file_names))
 
     if chunk_resolution:
-        query_filter.append(build_resolution_filter(chunk_resolution=chunk_resolution))
+        list_filters.append(build_resolution_filter(chunk_resolution=chunk_resolution))
+
+        query_filter = {"bool": 
+                { "must" : list_filters}  #filter returns the results that matches all the listed filter. This is a logical AND operator. The results must match all queries in this clause.
+                }
 
     log.warning(f"Final query filter: {query_filter}")
     return query_filter
@@ -158,7 +169,8 @@ def build_document_query(
                             "vector_field": {
                             "vector": query_vector,
                             "k": ai_settings.rag_num_candidates,
-                            "boost": ai_settings.knn_boost}
+                            "boost": ai_settings.knn_boost,
+                            "filter": query_filter}
                         }
                     },
                 ],

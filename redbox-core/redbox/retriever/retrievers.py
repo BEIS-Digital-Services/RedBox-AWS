@@ -128,6 +128,8 @@ def query_to_documents(
 ) -> list[Document]:
     """Runs an Elasticsearch query and returns Documents."""
     response = es_client.search(index=index_name, body=query)
+    logger.warning(f"Query sent to OpenSearch: {query}")
+    logger.warning(f"Response from OpenSearch: {response}")
     return [hit_to_doc(hit) for hit in response["hits"]["hits"]]
 
 

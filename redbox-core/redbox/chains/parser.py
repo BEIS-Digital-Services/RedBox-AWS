@@ -1,6 +1,7 @@
 from collections.abc import AsyncIterator
 from typing import Any, Iterator, Union
 import json
+import re
 
 from langchain_core.output_parsers import BaseCumulativeTransformOutputParser
 from langchain_core.output_parsers.format_instructions import JSON_FORMAT_INSTRUCTIONS
@@ -29,8 +30,27 @@ class StreamingJsonOutputParser(BaseCumulativeTransformOutputParser[Any]):
     name_of_streamed_field: str = "answer"
     pydantic_schema_object: type[BaseModel]
 
+    def extract_json(self, text):
+        if isinstance(text, list):
+            text = text[0].get("text")
+
+        try:
+            # Find content between first { and last }
+            match = re.search(r"(\{.*\})", text, re.DOTALL)
+            if not match:
+                return text
+
+            json_str = match.group(1)
+
+            return json_str
+
+        except Exception as e:
+            print(f"Error processing JSON: {e}")
+            return text
+
     def parse_partial_json(self, text: str):
         try:
+            text = self.extract_json(text)
             return parse_json_markdown(text)
         except json.JSONDecodeError:
             return None
