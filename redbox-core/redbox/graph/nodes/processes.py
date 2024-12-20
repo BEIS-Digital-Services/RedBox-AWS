@@ -120,11 +120,13 @@ def build_merge_pattern(
 
             document_state = {group_uuid: {document_uuid: merged_document}}
             request_metadata = {"source": "default_document"}  # Placeholder for metadata
-
+            log.warning(f"Initialized DocumentState.groups: {state.documents.groups}")
             # Return the updated document state and metadata
             return {"documents": DocumentState(groups=document_state), "metadata": request_metadata}
 
         flattened_documents = flatten_document_state(state.documents)
+        log.warning(f"Flattened document state: {flattened_documents}")
+
         merged_document = reduce(lambda left, right: combine_documents(left, right), flattened_documents)
 
         merge_state = RedboxState(
