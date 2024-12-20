@@ -94,7 +94,35 @@ def build_merge_pattern(
         llm = get_chat_llm(state.request.ai_settings.chat_backend, tools=tools)
 
         if not state.documents.groups:
-            return {"documents": None}
+            log.warning("DocumentState.groups is empty.")
+
+                # Create a default document with specified content and metadata
+            default_document = Document(
+                page_content="No documents provided.",
+                metadata={
+                    "uuid": "8e1c5616-140f-455b-90ae-cd9855658561",
+                    "token_count": 1357
+                }
+            )
+
+            # Set DocumentState to include the default document in a "default" group
+            state.documents = DocumentState(groups={"default": {default_document.metadata["uuid"]: default_document}})
+            
+            # Use the default document to simulate a merge-like behavior
+            merged_document = default_document
+            
+            # Add token count from the page content, if necessary
+            merged_document.metadata["token_count"] = len(tokeniser.encode(merged_document.page_content))
+
+            # Create a new document state structure
+            group_uuid = "default"
+            document_uuid = merged_document.metadata["uuid"]
+
+            document_state = {group_uuid: {document_uuid: merged_document}}
+            request_metadata = {"source": "default_document"}  # Placeholder for metadata
+
+            # Return the updated document state and metadata
+            return {"documents": DocumentState(groups=document_state), "metadata": request_metadata}
 
         flattened_documents = flatten_document_state(state.documents)
         merged_document = reduce(lambda left, right: combine_documents(left, right), flattened_documents)
