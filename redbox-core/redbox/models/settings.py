@@ -1,17 +1,18 @@
 import logging
 import os
 from functools import cache, lru_cache
-from typing import Literal, Union
+from typing import Literal, Union, Dict
+from urllib.parse import urlparse
 
 import boto3
 import environ
 from elasticsearch import Elasticsearch
-from openai import max_retries
-from opensearchpy import AWSV4SignerAuth, OpenSearch, RequestsHttpConnection
-from pydantic import BaseModel
+from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth
+from pydantic import BaseModel, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from redbox_app.setting_enums import Environment
 from langchain.globals import set_debug
+
 
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
 logger = logging.getLogger()
@@ -23,8 +24,36 @@ class OpenSearchSettings(BaseModel):
     """settings required for a aws/opensearch"""
 
     model_config = SettingsConfigDict(frozen=True)
+    #collection_endpoint: str
+    collection_endpoint: str = env.str("OPENSEARCH_HOST")
 
-    collection_endpoint: str = env.str("ELASTIC__COLLECTION_ENPDOINT")
+    @computed_field
+    @property
+    def user(self) -> str:
+        return urlparse(self.collection_endpoint).username
+
+    @computed_field
+    @property
+    def password(self) -> str:
+        return urlparse(self.collection_endpoint).password
+
+    @computed_field
+    @property
+    def host(self) -> str:
+        return urlparse(self.collection_endpoint).hostname
+
+    @computed_field
+    @property
+    def port(self) -> int:
+        return urlparse(self.collection_endpoint).port
+
+    @computed_field
+    @property
+    def opensearch_url(self) -> str:
+        url = urlparse(self.collection_endpoint)
+        if url.port is not None:
+            return f"{self.host}:{self.port}"
+        return self.host
 
 
 class ElasticLocalSettings(BaseModel):
@@ -68,12 +97,14 @@ class Settings(BaseSettings):
         name="gpt-4o", provider="azure_openai"
     )
 
-    embedding_backend: Literal[
-        "text-embedding-ada-002",
-        "amazon.titan-embed-text-v2:0",
-        "text-embedding-3-large",
-        "fake",
-    ] = "text-embedding-3-large"
+    #embedding_backend: Literal[
+    #    "text-embedding-ada-002",
+    #    "amazon.titan-embed-text-v2:0",
+    #    "text-embedding-3-large",
+    #    "fake",
+    #] = "text-embedding-3-large"
+    embedding_backend: str = "amazon.titan-embed-text-v2:0"
+    embedding_backend_vector_size: int = 1024
 
     llm_max_tokens: int = 1024
 
@@ -100,7 +131,7 @@ class Settings(BaseSettings):
     beats_system_password: str = "redboxpass"
 
     minio_host: str = "minio"
-    minio_port: int = 9000
+    minio_port: int = 9025
     aws_access_key: str | None = None
     aws_secret_key: str | None = None
 
@@ -142,6 +173,34 @@ class Settings(BaseSettings):
 
     )
 
+    #Define index mapping for Opensearch - this is important so that KNN search works
+    index_mapping : Dict = {
+    "settings": {
+    "index.knn": True
+    },
+    "mappings": {
+        "properties": {
+            "metadata": {
+                "properties": {
+                    "chunk_resolution": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+                    "created_datetime": {"type": "date"},
+                    "creator_type": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+                    "description": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+                    "index": {"type": "long"},
+                    "keywords": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+                    "name": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+                    "page_number": {"type": "long"},
+                    "token_count": {"type": "long"},
+                    "uri": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+                    "uuid": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}}
+                }
+            },
+            "text": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+            "vector_field": {"type": "knn_vector", "dimension": embedding_backend_vector_size, "method": {"name": "hnsw", "space_type": "cosinesimil", "engine": "lucene"}}     
+        }
+        }
+        }
+
     @property
     def elastic_chat_mesage_index(self):
         return self.elastic_root_index + "-chat-mesage-log"
@@ -154,7 +213,8 @@ class Settings(BaseSettings):
         logger.warning("Testing OpenSearch is definitely being used")
 
         if ENVIRONMENT.is_local:
-            auth = ("admin", "MyStrongPassword1!")
+            #auth = ("admin", "MyStrongPassword1!")
+            auth=None
             use_ssl = False
             verify_certs = False
             port = 9200
@@ -179,10 +239,12 @@ class Settings(BaseSettings):
             hosts=[{"host": OS_HOST, "port": OS_PORT}],
             http_auth=(OS_USERNAME, OS_PASSWORD),  # Basic Authentication
             use_ssl=use_ssl,
+            hosts=[{"host": OS_HOST, "port": OS_PORT}],
+            http_auth=(OS_USERNAME, OS_PASSWORD),  # Basic Authentication
             verify_certs=verify_certs,
             connection_class=RequestsHttpConnection,
             pool_maxsize=100,
-            timeout=30,
+            timeout=120,
             max_retries=3,
             retry_on_timeout=True,
         )
@@ -199,33 +261,26 @@ class Settings(BaseSettings):
         logger.warning(f"Client hosts: {client.transport.hosts}")
         logger.warning(f"Client connection class: {client.transport.connection_class}")
 
-        try:
-            if not client.indices.exists_alias(
-                name=f"{self.elastic_root_index}-chunk-current"
-            ):
-                logger.info("Alias does not exist, proceeding to create index and alias")
-                chunk_index = f"{self.elastic_root_index}-chunk"
+        if not client.indices.exists_alias(name=self.elastic_alias):
+            chunk_index = f"{self.elastic_root_index}-chunk"
+            # Ensure index creation does not raise an error if it already exists.
+            try:
+                #client.indices.create(
+                #    index=chunk_index, ignore=400
+                #)  # 400 is ignored to avoid index-already-exists errors
+                client.indices.create(index=chunk_index, body=self.index_mapping, ignore=400)
+            except Exception as e:
+                logger.error(f"Failed to create index {chunk_index}: {e}")
 
-                # Ensure index creation does not raise an error if it already exists.
-                try:
-                    client.indices.create(
-                        index=chunk_index, ignore=400
-                    )  # 400 is ignored to avoid index-already-exists errors
-                    logger.info(f"Index {chunk_index} created successfully")
-                except Exception as e:
-                    logger.error(f"Failed to create index {chunk_index}: {e}")
+            alias = f"{self.elastic_root_index}-chunk-current"
+            if not client.indices.exists_alias(name=alias):
+                client.indices.put_alias(index=chunk_index, name=alias)
 
-                try:
-                    client.indices.put_alias(
-                        index=chunk_index, name=f"{self.elastic_root_index}-chunk-current"
-                    )
-                    logger.info(f"Alias {self.elastic_root_index}-chunk-current created successfully")
-                except Exception as e:
-                    logger.error(
-                        f"Failed to set alias {self.elastic_root_index}-chunk-current: {e}"
-                    )
-        except Exception as e:
-            logger.error(f"Error while checking or creating alias: {e}")
+        response = client.index(
+            index="test-index",
+            body={"field": "value"}
+        )
+        logger.warning(f"Indexing response:", response)
 
         return client
 

@@ -396,8 +396,8 @@ class User(BaseUser, UUIDPrimaryKeyBase):
     class Usefulness(models.TextChoices):
         NOT_USED = "I have not used GenAI", _("I have not used GenAI")
         NOT_ENOUGH = (
-            "I have not used GenAI enough to say its useful or not",
-            _("I have not used GenAI enough to say its useful or not"),
+            "I have not used GenAI enough to say if it's useful or not",
+            _("I have not used GenAI enough to say if it's useful or not"),
         )
         NOT_FIGURED_OUT = (
             "I have not figured out how to best use GenAI",
@@ -733,12 +733,22 @@ class Chat(UUIDPrimaryKeyBase, TimeStampedModel, AbstractAISettings):
         )
 
     @property
-    def newest_message_date(self) -> date:
-        return self.chatmessage_set.aggregate(newest_date=Max("created_at"))["newest_date"].date()
+    def newest_message_date(self) -> date | None:
+        newest_date = self.chatmessage_set.aggregate(newest_date=Max("created_at"))["newest_date"]
+        if newest_date is None:
+            logger.warning(f"Chat {self.id} has no messages; returning None for newest_message_date.")
+            return None
+        return newest_date.date()
+
 
     @property
     def date_group(self):
-        return get_date_group(self.newest_message_date)
+        newest_date = self.newest_message_date
+        if newest_date is None:
+            logger.warning(f"Chat {self.id} has no newest_message_date; returning default date group.")
+            return None  # Or return a default value as appropriate
+        return get_date_group(newest_date)
+
 
 
 class Citation(UUIDPrimaryKeyBase, TimeStampedModel):
@@ -746,6 +756,14 @@ class Citation(UUIDPrimaryKeyBase, TimeStampedModel):
         WIKIPEDIA = "Wikipedia", _("wikipedia")
         USER_UPLOADED_DOCUMENT = "UserUploadedDocument", _("user uploaded document")
         GOV_UK = "GOV.UK", _("gov.uk")
+
+        @classmethod
+        def try_parse(cls, value):
+            try:
+                return cls(value)
+            except ValueError:
+                logger.warning("failed to parse %s to Origin", value)
+                return None
 
     file = models.ForeignKey(
         File,
@@ -768,6 +786,8 @@ class Citation(UUIDPrimaryKeyBase, TimeStampedModel):
         choices=Origin,
         help_text="source of citation",
         default=Origin.USER_UPLOADED_DOCUMENT,
+        null=True,
+        blank=True,
     )
     text_in_answer = models.TextField(
         null=True,

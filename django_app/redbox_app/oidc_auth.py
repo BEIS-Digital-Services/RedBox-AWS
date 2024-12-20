@@ -80,6 +80,9 @@ class CustomOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         if 'is_redbox_admin' in claims:
             user.is_staff = True
             user.is_superuser = True
+        else:
+            user.is_staff = False
+            user.is_superuser = False
 
         # Save the user
         user.save()
@@ -93,6 +96,9 @@ class CustomOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         if 'is_redbox_admin' in claims:
             user.is_staff = True
             user.is_superuser = True
+        else:
+            user.is_staff = False
+            user.is_superuser = False
 
         # Save the updated user
         user.save()
