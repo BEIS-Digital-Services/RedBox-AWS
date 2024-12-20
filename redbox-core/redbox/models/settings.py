@@ -33,7 +33,7 @@ class ElasticLocalSettings(BaseModel):
     model_config = SettingsConfigDict(frozen=True)
 
     host: str = "elasticsearch"
-    port: int = 9200
+    port: int = 443
     scheme: str = "http"
     user: str = "elastic"
     version: str = "8.11.0"
@@ -159,17 +159,21 @@ class Settings(BaseSettings):
             verify_certs = False
             port = 9200
         else:
-            credentials = boto3.Session().get_credentials()
-            credentials = credentials.get_frozen_credentials()
-            logger.info(f"Refreshed credentials: {credentials}")
             
-            auth = AWSV4SignerAuth(credentials, "eu-west-2")
             use_ssl = True
             verify_certs = True
             port = 443
+        if opensearch_url.startswith("https://"):
+            opensearch_url = opensearch_url[len("https://"):]
+ 
+        OS_HOST = opensearch_url
+        logger.warning(f"OpenSearch is={OS_HOST}")
+        OS_PORT = port
+        OS_USERNAME = env.str("OPENSEARCH_USER")
+        OS_PASSWORD = env.str("OPENSEARCH_PASSWORD")
         client = OpenSearch(
-            hosts=[{"host": env.str("ELASTIC__COLLECTION_ENPDOINT"), "port": port}],
-            http_auth=auth,
+            hosts=[{"host": OS_HOST, "port": OS_PORT}],
+            http_auth=(OS_USERNAME, OS_PASSWORD),  # Basic Authentication
             use_ssl=use_ssl,
             verify_certs=verify_certs,
             connection_class=RequestsHttpConnection,
