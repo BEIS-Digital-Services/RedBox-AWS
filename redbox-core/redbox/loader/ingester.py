@@ -40,7 +40,6 @@ else:
     username = env_vars.str('OPENSEARCH_USER')
     password = env_vars.str('OPENSEARCH_PASSWORD')
     opensearch_url = f"https://{username}:{password}@{opensearch_host}:443"
-    #opensearch_url = env_vars.str('OPENSEARCH_HOST')
 
 def clean_json_metadata(raw_metadata: str) -> str:
     """Clean and extract valid JSON from raw metadata."""

@@ -220,38 +220,24 @@ class Settings(BaseSettings):
             port = 9200
             logger.warning("Using local environment with basic auth")
         else:
-            #credentials = boto3.Session().get_credentials()
-            #credentials = credentials.get_frozen_credentials()
-            #logger.info(f"Refreshed credentials: {credentials}")
-            
-            # Initialize AWS4Auth for SigV4 signing
-            #auth = AWSV4SignerAuth(credentials, "eu-west-2", service="es")
+           #credentials = boto3.Session().get_credentials()
+           #credentials = credentials.get_frozen_credentials()
+           #auth = AWSV4SignerAuth(credentials, "eu-west-2")
             use_ssl = True
             verify_certs = True
             port = 443
-            ##logger.warning("Using AWS authentication with V4 signer")
-
-        opensearch_url = env.str("OPENSEARCH_HOST")
-
-        # Strip 'https://' from the URL
+            logger.warning("Using AWS authentication with V4 signer")
         if opensearch_url.startswith("https://"):
             opensearch_url = opensearch_url[len("https://"):]
-
+ 
         OS_HOST = opensearch_url
         logger.warning(f"OpenSearch is={OS_HOST}")
-        #credentials, host_port = opensearch_url.split("@")
-        #OS_USERNAME, OS_PASSWORD = credentials.split(":")
-        #OS_HOST, OS_PORT = host_port.split(":")
-        #OS_PORT = int(OS_PORT)  # Convert port to integer
-        OS_PORT = 443
+        OS_PORT = port
         OS_USERNAME = env.str("OPENSEARCH_USER")
         OS_PASSWORD = env.str("OPENSEARCH_PASSWORD")
-
-        logger.warning(f"Connecting to OpenSearch at host={opensearch_url}")
-
         client = OpenSearch(
-            #hosts=[opensearch_url],
-            #http_auth=auth,
+            hosts=[{"host": OS_HOST, "port": OS_PORT}],
+            http_auth=(OS_USERNAME, OS_PASSWORD),  # Basic Authentication
             use_ssl=use_ssl,
             hosts=[{"host": OS_HOST, "port": OS_PORT}],
             http_auth=(OS_USERNAME, OS_PASSWORD),  # Basic Authentication
