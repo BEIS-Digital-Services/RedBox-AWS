@@ -3,7 +3,7 @@
 # 📮 Redbox
 
 > [!IMPORTANT]
-> Incubation Project: This project is an incubation project; as such, we DON’T recommend using it in any critical use case. This project is in active development and a work in progress. This project may one day Graduate, in which case this disclaimer will be removed.
+> Incubation Project: This project is an incubation project; as such, we DON’T recommend using it in any critical use case. This project is in active development and a work in progress. This project may one day Graduate, in which case this disclaimer will be removed
 
 > [!NOTE]
 > The original streamlit-app has moved to its own repository https://github.com/i-dot-ai/redbox-copilot-streamlit.
