@@ -24,7 +24,7 @@ class OpenSearchSettings(BaseModel):
 
     model_config = SettingsConfigDict(frozen=True)
 
-    collection_endpoint: str = env.str("ELASTIC__COLLECTION_ENPDOINT")
+    collection_endpoint: str = env.str("OPENSEARCH_HOST")
 
 
 class ElasticLocalSettings(BaseModel):
