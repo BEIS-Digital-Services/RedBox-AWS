@@ -163,6 +163,9 @@ class Settings(BaseSettings):
             use_ssl = True
             verify_certs = True
             port = 443
+
+        opensearch_url = env.str('OPENSEARCH_HOST')
+
         if opensearch_url.startswith("https://"):
             opensearch_url = opensearch_url[len("https://"):]
  
