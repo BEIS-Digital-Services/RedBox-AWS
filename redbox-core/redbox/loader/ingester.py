@@ -26,10 +26,11 @@ alias = env.elastic_chunk_alias
 if ENVIRONMENT.is_local:
     opensearch_url="https://localhost:9200"
 else:
-    opensearch_host = env_vars.str('OPENSEARCH_HOST')  # Ensure this includes the endpoint
-    username = env_vars.str('OPENSEARCH_USER')
-    password = env_vars.str('OPENSEARCH_PASSWORD')
-    opensearch_url = f"https://{username}:{password}@{opensearch_host}:443"
+    opensearch_url = f"https://{env_vars.str('OPENSEARCH_HOST')}"
+    #opensearch_host = env_vars.str('OPENSEARCH_HOST')  # Ensure this includes the endpoint
+    #username = env_vars.str('OPENSEARCH_USER')
+    #password = env_vars.str('OPENSEARCH_PASSWORD')
+    #opensearch_url = f"https://{username}:{password}@{opensearch_host}:443"
 
 def clean_json_metadata(raw_metadata: str) -> str:
     """Clean and extract valid JSON from raw metadata."""
