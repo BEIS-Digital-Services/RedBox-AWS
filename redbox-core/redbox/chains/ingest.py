@@ -17,7 +17,7 @@ else:
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger()
-
+log.warning("inside ingest.py")
 
 @chain
 def log_chunks(chunks: list[Document]):
@@ -28,6 +28,7 @@ def log_chunks(chunks: list[Document]):
 def document_loader(document_loader: UnstructuredChunkLoader, s3_client: S3Client, env: Settings) -> Runnable:
     @chain
     def wrapped(file_name: str) -> Iterator[Document]:
+        log.warning("inside ingest.py inside document_loader")
         file_bytes = s3_client.get_object(Bucket=env.bucket_name, Key=file_name)["Body"].read()
         return document_loader.lazy_load(file_name=file_name, file_bytes=BytesIO(file_bytes))
 
@@ -40,6 +41,7 @@ def ingest_from_loader(
     vectorstore: VectorStore,
     env: Settings,
 ) -> Runnable:
+    log.warning("inside ingest.py inside ingest_from_loader")
     return (
         document_loader(document_loader=loader, s3_client=s3_client, env=env)
         | RunnableLambda(list)

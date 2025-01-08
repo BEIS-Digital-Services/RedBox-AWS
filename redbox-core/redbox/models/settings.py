@@ -15,6 +15,7 @@ from langchain.globals import set_debug
 
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
 logger = logging.getLogger()
+logger.warning("inside settings.py")
 env = environ.Env()
 ENVIRONMENT = Environment[env.str("ENVIRONMENT").upper()]
 
@@ -152,7 +153,7 @@ class Settings(BaseSettings):
 
     @lru_cache(1)
     def elasticsearch_client(self) -> Union[Elasticsearch, OpenSearch]:
-        logger.info("Testing OpenSearch is definitely being used")
+        logger.warning("inside settings.py inside elasticsearch_client")
         if ENVIRONMENT.is_local:
             auth = ("admin", "MyStrongPassword1!")
             use_ssl = False
@@ -177,6 +178,8 @@ class Settings(BaseSettings):
         #OS_PORT = port
         #OS_USERNAME = env.str("OPENSEARCH_USER")
         #OS_PASSWORD = env.str("OPENSEARCH_PASSWORD")
+        logger.warning("inside settings.py before client object created")
+
         client = OpenSearch(
             hosts=[{"host": env.str("OPENSEARCH_HOST"), "port": port}],
             http_auth=auth,
@@ -190,6 +193,19 @@ class Settings(BaseSettings):
             max_retries=3,
             retry_on_timeout=True,
         )
+
+        logger.warning("inside settings.py before we print indices")
+
+        # List all indices in the OpenSearch collection
+        try:
+            indices = client.cat.indices(format="json")
+            print("Indices in the collection:")
+            for index in indices:
+                print(f"- {index['index']}")
+        except Exception as e:
+            print(f"Error fetching indices: {e}")
+
+        logger.warning("inside settings.py after we print indices")
 
         logger.info(f"Client hosts: {client.transport.hosts}")
         logger.info(f"Client connection class: {client.transport.connection_class}")

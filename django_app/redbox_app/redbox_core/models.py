@@ -26,6 +26,8 @@ logger = logging.getLogger(__name__)
 
 env = get_settings()
 
+logger.warning("inside models.py")
+
 es_client = env.elasticsearch_client()
 
 
@@ -599,6 +601,7 @@ class File(UUIDPrimaryKeyBase, TimeStampedModel):
         self.original_file.delete(save=False)
 
     def delete_from_elastic(self):
+        logger.warning("inside models.py inside delete_from_elastic")
         index = env.elastic_chunk_alias
         if es_client.indices.exists(index=index):
             es_client.delete_by_query(

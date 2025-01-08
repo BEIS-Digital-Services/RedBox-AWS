@@ -19,6 +19,7 @@ else:
     S3Client = object
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger()
+log.warning("inside ingester.py")
 env = get_settings()
 env_vars = environ.Env()
 ENVIRONMENT = Environment[env_vars.str("ENVIRONMENT").upper()]
@@ -57,7 +58,7 @@ def get_elasticsearch_store(es, es_index_name: str):
         index_name=es_index_name,
         embedding=get_embeddings(env),
         es_connection=es,
-        opensearch_url = opensearch_url,
+        #opensearch_url = opensearch_url,
         embedding_function=get_embeddings(env),
         query_field="text",
         vector_query_field=env.embedding_document_field_name,
@@ -74,17 +75,20 @@ def get_elasticsearch_store_without_embeddings(es, es_index_name: str):
         es_connection=es,
         query_field="text",
         strategy=BM25Strategy(),
-        opensearch_url = opensearch_url,
+        #opensearch_url = opensearch_url,
         embedding_function=get_embeddings(env),
     )
 def create_alias(alias: str):
+    log.warning("inside ingester.py inside create_alias")
     es = env.elasticsearch_client()
     chunk_index_name = alias[:-8]  # removes -current
     #es.options(ignore_status=[400]).indices.create(index=chunk_index_name)
     es.indices.create(index=chunk_index_name, ignore=400)
     es.indices.put_alias(index=chunk_index_name, name=alias)
+
 def _ingest_file(file_name: str, es_index_name: str = alias):
-    logging.info("Ingesting file: %s", file_name)
+    log.warning("inside ingester.py inside _ingest_file")
+    logging.warning("Ingesting file: %s", file_name)
     es = env.elasticsearch_client()
     if es_index_name == alias:
         if not es.indices.exists_alias(name=alias):
@@ -103,13 +107,13 @@ def _ingest_file(file_name: str, es_index_name: str = alias):
         else:
             raw_metadata_json = str(raw_metadata)
         metadata = clean_json_metadata(raw_metadata_json)
-        logging.info(f"Cleaned metadata: {metadata}")
+        logging.warning(f"Cleaned metadata: {metadata}")
     except OutputParserException as e:
         logging.error(f"Failed to clean metadata: {e}")
         raise
     # Initialize chunk_ingest_chain
     vectorstore_normal = get_elasticsearch_store(es, es_index_name)
-    logging.info(f"Vectorstore (normal) initialized: {vectorstore_normal}")
+    logging.warning(f"Vectorstore (normal) initialized: {vectorstore_normal}")
     chunk_ingest_chain = ingest_from_loader(
         loader=UnstructuredChunkLoader(
             chunk_resolution=ChunkResolution.normal,
@@ -125,7 +129,7 @@ def _ingest_file(file_name: str, es_index_name: str = alias):
     )
     # Initialize large_chunk_ingest_chain
     vectorstore_large = get_elasticsearch_store_without_embeddings(es, es_index_name)
-    logging.info(f"Vectorstore (large) initialized: {vectorstore_large}")
+    logging.warning(f"Vectorstore (large) initialized: {vectorstore_large}")
     large_chunk_ingest_chain = ingest_from_loader(
         loader=UnstructuredChunkLoader(
             chunk_resolution=ChunkResolution.largest,
@@ -143,7 +147,7 @@ def _ingest_file(file_name: str, es_index_name: str = alias):
     # Process the chains
     new_ids = RunnableParallel({"normal": chunk_ingest_chain, "largest": large_chunk_ingest_chain}).invoke(file_name)
 
-    logging.info(
+    logging.warning(
         "File: %s %s chunks ingested",
         file_name,
         {k: len(v) for k, v in new_ids.items()},

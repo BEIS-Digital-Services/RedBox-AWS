@@ -5,6 +5,7 @@ from django.core.management import BaseCommand, CommandError
 from redbox.models.settings import get_settings
 
 logger = logging.getLogger(__name__)
+logger.warning("inside delete_es_indices.py")
 
 env = get_settings()
 
@@ -24,6 +25,7 @@ class Command(BaseCommand):
         parser.add_argument("new_index", nargs="?", type=str)
 
     def list_chunk_indices(self):
+        logger.warning("inside delete_es_indices.py inside list_chunk_indices")
         try:
             # Get all indices
             indices = es_client.cat.indices(format="json")
@@ -33,6 +35,7 @@ class Command(BaseCommand):
             logger.exception("Error fetching indices", exc_info=e)
 
     def handle(self, *_args, **kwargs):
+        logger.warning("inside delete_es_indices.py inside handle")
         if not kwargs["new_index"]:
             msg = "No new index given for alias"
             raise CommandError(msg)

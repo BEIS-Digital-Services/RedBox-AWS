@@ -28,6 +28,11 @@ from redbox.transform import (
     structure_documents_by_group_and_indices,
 )
 
+import logging
+
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger()
+log.warning("inside tools.py")
 
 def is_valid_tool(tool: StructuredTool) -> bool:
     """Checks whether the supplied tool will correctly update the state.
@@ -82,10 +87,12 @@ def build_search_documents_tool(
     embedding_field_name: str,
     chunk_resolution: ChunkResolution | None,
 ) -> Tool:
+    log.warning("inside tools.py inside build_search_documents_tool")
     """Constructs a tool that searches the index and sets state["documents"]."""
 
     @tool
     def _search_documents(query: str, state: Annotated[RedboxState, InjectedState]) -> dict[str, Any]:
+        log.warning("inside tools.py inside _search_documents")
         """
         Search for documents uploaded by the user based on a query string.
 

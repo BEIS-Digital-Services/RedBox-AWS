@@ -32,7 +32,7 @@ async def _default_callback(*args, **kwargs):
 
 
 logger = getLogger(__name__)
-
+logger.warning("inside app.py")
 
 class Redbox:
     def __init__(
@@ -54,7 +54,7 @@ class Redbox:
         self.embedding_model = embedding_model or get_embeddings(_env)
 
         # Tools
-
+        logger.warning("inside app.py before search_documents")
         search_documents = build_search_documents_tool(
             es_client=_env.elasticsearch_client(),
             index_name=f"{_env.elastic_root_index}-chunk",
