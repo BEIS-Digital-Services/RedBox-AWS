@@ -58,7 +58,7 @@ def get_elasticsearch_store(es, es_index_name: str):
         index_name=es_index_name,
         embedding=get_embeddings(env),
         es_connection=es,
-        #opensearch_url = opensearch_url,
+        opensearch_url = opensearch_url,
         embedding_function=get_embeddings(env),
         query_field="text",
         vector_query_field=env.embedding_document_field_name,
@@ -75,7 +75,7 @@ def get_elasticsearch_store_without_embeddings(es, es_index_name: str):
         es_connection=es,
         query_field="text",
         strategy=BM25Strategy(),
-        #opensearch_url = opensearch_url,
+        opensearch_url = opensearch_url,
         embedding_function=get_embeddings(env),
     )
 def create_alias(alias: str):
