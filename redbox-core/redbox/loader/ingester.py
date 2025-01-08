@@ -91,7 +91,7 @@ def _ingest_file(file_name: str, es_index_name: str = alias):
     logging.warning("Ingesting file: %s", file_name)
     es = env.elasticsearch_client()
     if es_index_name == alias:
-        if not es.indices.exists_alias(name=alias):
+        if not es.indices.exists_alias(index="_all", name=es_index_name):  # Enforces the correct alias endpoint
             logging.info("The alias does not exist")
             logging.info(f"Alias: {alias}, Exists: {es.indices.exists_alias(name=alias)}")
             create_alias(alias)
