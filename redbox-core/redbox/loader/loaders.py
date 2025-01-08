@@ -20,7 +20,7 @@ import json
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
-
+logger.warning("inside loaders.py")
 encoding = tiktoken.get_encoding("cl100k_base")
 
 if TYPE_CHECKING:

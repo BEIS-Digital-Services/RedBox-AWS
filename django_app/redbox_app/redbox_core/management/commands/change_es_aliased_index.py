@@ -6,6 +6,7 @@ from redbox.models.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
+logger.warning("inside change_es_aliased_index.py")
 env = get_settings()
 
 es_client = env.elasticsearch_client()
@@ -27,6 +28,7 @@ class Command(BaseCommand):
         parser.add_argument("alias", nargs="?", type=str, default=default_alias)
 
     def handle(self, *_args, **kwargs):
+        logger.warning("inside change_es_aliased_index.py inside handle")
         try:
             response = es_client.indices.get_alias(name=kwargs["alias"])
             indices_to_remove = list(response)

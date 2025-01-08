@@ -1,5 +1,6 @@
 import logging
 from functools import partial
+from math import log
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Union, cast
 
 import opensearchpy
@@ -24,7 +25,7 @@ from redbox.retriever.queries import (
 from redbox.transform import merge_documents, sort_documents
 
 logger = logging.getLogger(__name__)
-
+logger.warning("inside retrievers.py")
 
 class OpenSearchRetriever(BaseRetriever):
     """OpenSearch Retriever."""
@@ -69,7 +70,7 @@ class OpenSearchRetriever(BaseRetriever):
         password: Optional[str] = None,
         params: Optional[Dict[str, Any]] = None,
     ) -> "OpenSearchRetriever":
-
+        logger.warning("inside inside retrievers.py from_os_params")
         es_client = self.es_client
         return OpenSearchRetriever(
             es_client=es_client,
@@ -82,6 +83,7 @@ class OpenSearchRetriever(BaseRetriever):
     def _get_relevant_documents(
         self, query: str, *, run_manager: CallbackManagerForRetrieverRun
     ) -> List[Document]:
+        logger.warning("inside retrievers.py inside _get_relevant_documents")
         if not self.es_client or not self.document_mapper:
             raise ValueError("OpenSearch client or document mapper is not initialized")
 
@@ -125,6 +127,7 @@ def hit_to_doc(hit: dict[str, Any]) -> Document:
 
 def query_to_documents(es_client: Union[Elasticsearch, OpenSearch], index_name: str, query: dict[str, Any]) -> list[Document]:
     """Runs an Elasticsearch query and returns Documents."""
+    logger.warning("inside retrievers.py inside query_to_documents")
     response = es_client.search(index=index_name, body=query)
     return [hit_to_doc(hit) for hit in response["hits"]["hits"]]
 
@@ -196,11 +199,12 @@ class OpenSearchRetriever(BaseRetriever):
         password : Optional[str] = None,
         params: Optional[Dict[str, Any]] = None,
         ) -> "OpenSearchRetriever":
-
+        logger.warning("inside inside retrievers.py inside from_os_params")
         es_client = self.es_client
         return OpenSearchRetriever(es_client=es_client, index_name=index_name, body_func=body_func, content_field=content_field, document_mapper=document_mapper)
 
     def _get_relevant_documents(self, query: str, *, run_manager: CallbackManagerForRetrieverRun) -> List[Document]:
+        logger.warning("inside retrievers.py inside _get_relevant_documents")
         if not self.es_client or not self.document_mapper:
             raise ValueError("OpenSearch client or document mapper is not initialized")
 
@@ -231,6 +235,7 @@ class ParameterisedElasticsearchRetriever(BaseRetriever):
     def _get_relevant_documents(
         self, query: RedboxState, *, run_manager: CallbackManagerForRetrieverRun
     ) -> list[Document]:
+        logger.warning("inside retrievers.py inside _get_relevant_documents")
         query_text = query["messages"][-1].content
         query_vector = self.embedding_model.embed_query(query_text)
         selected_files = query["request"].s3_keys
@@ -293,6 +298,7 @@ class AllElasticsearchRetriever(OpenSearchRetriever):
     def _get_relevant_documents(
         self, query: RedboxState, *, run_manager: CallbackManagerForRetrieverRun
     ) -> list[Document]:  # noqa:ARG002
+        logger.warning("inside retrievers.py inside _get_relevant_documents")
         # if not self.es_client or not self.document_mapper:
         #    msg = "faulty configuration"
         #    raise ValueError(msg)  # should not happen
@@ -328,6 +334,7 @@ class MetadataRetriever(OpenSearchRetriever):
     def _get_relevant_documents(
         self, query: RedboxState, *, run_manager: CallbackManagerForRetrieverRun
     ) -> list[Document]:  # noqa:ARG002
+        logger.warning("inside retrievers.py inside _get_relevant_documents")
         # if not self.es_client or not self.document_mapper:
         #    msg = "faulty configuration"
         #    raise ValueError(msg)  # should not happen

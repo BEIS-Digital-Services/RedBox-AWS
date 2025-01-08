@@ -23,6 +23,7 @@ from redbox.models.chain import StructuredResponseWithCitations
 
 
 logger = logging.getLogger(__name__)
+logger.warning("inside components.py")
 load_dotenv()
 
 
@@ -83,6 +84,7 @@ def get_embeddings(env: Settings) -> Embeddings:
 
 
 def get_all_chunks_retriever(env: Settings) -> OpenSearchRetriever:
+    logger.warning("inside components.py get_all_chunks_retriever")
     return AllElasticsearchRetriever(
         es_client=env.elasticsearch_client(),
         index_name=env.elastic_chunk_alias,
@@ -96,6 +98,7 @@ def get_parameterised_retriever(env: Settings, embeddings: Embeddings | None = N
 
     Runnable returns a list of Chunks.
     """
+    logger.warning("inside components.py inside get_parameterised_retriever")
     return ParameterisedElasticsearchRetriever(
         es_client=env.elasticsearch_client(),
         index_name=env.elastic_chunk_alias,
@@ -105,6 +108,7 @@ def get_parameterised_retriever(env: Settings, embeddings: Embeddings | None = N
 
 
 def get_metadata_retriever(env: Settings):
+    logger.warning("inside components.py inside get_metadata_retriever")
     return MetadataRetriever(
         es_client=env.elasticsearch_client(),
         index_name=env.elastic_chunk_alias,
