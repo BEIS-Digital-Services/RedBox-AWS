@@ -87,12 +87,11 @@ def build_search_documents_tool(
     embedding_field_name: str,
     chunk_resolution: ChunkResolution | None,
 ) -> Tool:
-    log.warning("inside tools.py inside build_search_documents_tool")
     """Constructs a tool that searches the index and sets state["documents"]."""
+    log.warning("inside tools.py inside build_search_documents_tool")
 
     @tool
     def _search_documents(query: str, state: Annotated[RedboxState, InjectedState]) -> dict[str, Any]:
-        log.warning("inside tools.py inside _search_documents")
         """
         Search for documents uploaded by the user based on a query string.
 
@@ -108,6 +107,8 @@ def build_search_documents_tool(
         Returns:
             dict[str, Any]: A collection of document objects that match the query.
         """
+        log.warning("inside tools.py inside _search_documents")
+        
         query_vector = embedding_model.embed_query(query)
         selected_files = state["request"].s3_keys
         permitted_files = state["request"].permitted_s3_keys
