@@ -65,12 +65,24 @@ def ingest_from_loader(
 ) -> Runnable:
     log.warning("inside ingest.py inside ingest_from_loader")
     try:
-        return (
-            document_loader(document_loader=loader, s3_client=s3_client, env=env)
-            | RunnableLambda(list)
-            | log_chunks
-            | RunnableLambda(partial(vectorstore.add_documents, create_index_if_not_exists=False))  # type: ignore[arg-type]
-        )
+        doc_loader = document_loader(document_loader=loader, s3_client=s3_client, env=env)
+        doc_list = RunnableLambda(list)
+        log_chunk_step = log_chunks
+
+        def safe_add_documents(docs):
+            try:
+                log.warning("Attempting to add documents to vectorstore...")
+                return vectorstore.add_documents(docs, create_index_if_not_exists=False)
+            except AuthorizationException as e:
+                log.error(f"403 Authorization Error in vectorstore.add_documents: {e}")
+                raise
+            except Exception as e:
+                log.error(f"Unexpected error in vectorstore.add_documents: {e}")
+                raise
+
+        add_docs = RunnableLambda(safe_add_documents)
+
+        return doc_loader | doc_list | log_chunk_step | add_docs
     except AuthorizationException as e:
         log.error(f"403 Authorization Error in ingest_from_loader: {e}")
         raise
