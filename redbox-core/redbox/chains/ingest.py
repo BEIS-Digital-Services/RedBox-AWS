@@ -2,6 +2,7 @@ import logging
 from functools import partial
 from io import BytesIO
 from typing import TYPE_CHECKING, Iterator
+import boto3
 
 from langchain.vectorstores import VectorStore
 from langchain_core.documents.base import Document
@@ -72,6 +73,16 @@ def ingest_from_loader(
         def safe_add_documents(docs):
             try:
                 log.warning("Attempting to add documents to vectorstore...")
+
+                credentials = boto3.Session().get_credentials()
+                if not credentials.token:
+                    log.warning("Warning: No session token, request may be anonymous.")
+
+                log.warning(f"Client host: {vectorstore.client.transport.hosts}")
+
+                index_exists = vectorstore.client.indices.exists(index="redbox-data-chunk")
+                log.warning(f"Index exists check: {index_exists}")
+                
                 return vectorstore.add_documents(docs, create_index_if_not_exists=False)
             except AuthorizationException as e:
                 log.error(f"403 Authorization Error in vectorstore.add_documents: {e}")
