@@ -140,36 +140,50 @@ def _ingest_file(file_name: str, es_index_name: str = alias):
     # Initialize chunk_ingest_chain
     vectorstore_normal = get_elasticsearch_store(es, es_index_name)
     log.warning(f"Vectorstore (normal) initialized: {vectorstore_normal}")
-    chunk_ingest_chain = ingest_from_loader(
-        loader=UnstructuredChunkLoader(
-            chunk_resolution=ChunkResolution.normal,
+    try:
+        chunk_ingest_chain = ingest_from_loader(
+            loader=UnstructuredChunkLoader(
+                chunk_resolution=ChunkResolution.normal,
+                env=env,
+                min_chunk_size=env.worker_ingest_min_chunk_size,
+                max_chunk_size=env.worker_ingest_max_chunk_size,
+                overlap_chars=0,
+                metadata=metadata,
+            ),
+            s3_client=env.s3_client(),
+            vectorstore=vectorstore_normal,
             env=env,
-            min_chunk_size=env.worker_ingest_min_chunk_size,
-            max_chunk_size=env.worker_ingest_max_chunk_size,
-            overlap_chars=0,
-            metadata=metadata,
-        ),
-        s3_client=env.s3_client(),
-        vectorstore=vectorstore_normal,
-        env=env,
-    )
+        )
+    except AuthorizationException as e:
+        log.error(f"403 Authorization Error in _ingest_file for chunk_ingest_chain (using ingest_from_loader): {e}")
+        raise
+    except Exception as e:
+        log.error(f"Other Error in _ingest_file for chunk_ingest_chain (using ingest_from_loader): {e}")
+        raise
 
     # Initialize large_chunk_ingest_chain
     vectorstore_large = get_elasticsearch_store_without_embeddings(es, es_index_name)
     log.warning(f"Vectorstore (large) initialized: {vectorstore_large}")
-    large_chunk_ingest_chain = ingest_from_loader(
-        loader=UnstructuredChunkLoader(
-            chunk_resolution=ChunkResolution.largest,
+    try:
+        large_chunk_ingest_chain = ingest_from_loader(
+            loader=UnstructuredChunkLoader(
+                chunk_resolution=ChunkResolution.largest,
+                env=env,
+                min_chunk_size=env.worker_ingest_largest_chunk_size,
+                max_chunk_size=env.worker_ingest_largest_chunk_size,
+                overlap_chars=env.worker_ingest_largest_chunk_overlap,
+                metadata=metadata,
+            ),
+            s3_client=env.s3_client(),
+            vectorstore=vectorstore_large,
             env=env,
-            min_chunk_size=env.worker_ingest_largest_chunk_size,
-            max_chunk_size=env.worker_ingest_largest_chunk_size,
-            overlap_chars=env.worker_ingest_largest_chunk_overlap,
-            metadata=metadata,
-        ),
-        s3_client=env.s3_client(),
-        vectorstore=vectorstore_large,
-        env=env,
-    )
+        )
+    except AuthorizationException as e:
+        log.error(f"403 Authorization Error in _ingest_file for large_chunk_ingest_chain (using ingest_from_loader): {e}")
+        raise
+    except Exception as e:
+        log.error(f"Other Error in _ingest_file for large_chunk_ingest_chain (using ingest_from_loader): {e}")
+        raise
 
     # Process the chains
     try:
