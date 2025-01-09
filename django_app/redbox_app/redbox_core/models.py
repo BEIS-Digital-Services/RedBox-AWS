@@ -18,7 +18,7 @@ from django.utils.translation import gettext_lazy as _
 from django_use_email_as_username.models import BaseUser, BaseUserManager
 from yarl import URL
 
-from redbox.models.settings import get_settings
+from redbox.models.settings import get_settings, catch_403
 from redbox_app.redbox_core.utils import get_date_group
 
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
@@ -600,6 +600,7 @@ class File(UUIDPrimaryKeyBase, TimeStampedModel):
         """Manually deletes the file from S3 storage."""
         self.original_file.delete(save=False)
 
+    @catch_403
     def delete_from_elastic(self):
         logger.warning("inside models.py inside delete_from_elastic")
         index = env.elastic_chunk_alias

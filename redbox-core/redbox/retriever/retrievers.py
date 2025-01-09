@@ -1,3 +1,4 @@
+from calendar import c
 import logging
 from functools import partial
 from math import log
@@ -23,85 +24,10 @@ from redbox.retriever.queries import (
     get_metadata,
 )
 from redbox.transform import merge_documents, sort_documents
+from redbox.models.settings import catch_403
 
 logger = logging.getLogger(__name__)
 logger.warning("inside retrievers.py")
-
-class OpenSearchRetriever(BaseRetriever):
-    """OpenSearch Retriever."""
-
-    es_client: OpenSearch
-    index_name: Union[str, Sequence[str]]
-    body_func: Callable[[str], Dict]
-    content_field: Optional[Union[str, Mapping[str, str]]] = None
-    document_mapper: Optional[Callable[[Mapping], Document]] = None
-
-    def __init__(self, **kwargs: Any):
-        super().__init__(**kwargs)
-        self.content_field = str(self.content_field)
-
-        # if self.content_field is None and self.document_mapper is None:
-        #     raise ValueError("Either content_field or document_mapper must be provided")
-
-        # if self.content_field is not None and self.document_mapper is not None:
-        #     raise ValueError("Only one of content_field or document_mapper can be provided")
-
-        if not self.document_mapper:
-            self.document_mapper = self._single_field_mapper
-        elif isinstance(self.content_field, Mapping):
-            self.document_mapper = self._multi_field_mapper
-        # else:
-        #     print(self.content_field)
-        #     raise ValueError("content_field must be a string or a mapping")
-
-        # self.os_client = create_opensearch_client(**kwargs)
-
-    @staticmethod
-    def from_os_params(
-        self,
-        index_name: Union[str, Sequence[str]],
-        body_func: Callable[[str], Dict],
-        content_field: Optional[Union[str, Mapping[str, str]]] = None,
-        document_mapper: Optional[Callable[[Mapping], Document]] = None,
-        opensearch_url: Optional[str] = None,
-        cloud_id: Optional[str] = None,
-        api_key: Optional[str] = None,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
-        params: Optional[Dict[str, Any]] = None,
-    ) -> "OpenSearchRetriever":
-        logger.warning("inside inside retrievers.py from_os_params")
-        es_client = self.es_client
-        return OpenSearchRetriever(
-            es_client=es_client,
-            index_name=index_name,
-            body_func=body_func,
-            content_field=content_field,
-            document_mapper=document_mapper,
-        )
-
-    def _get_relevant_documents(
-        self, query: str, *, run_manager: CallbackManagerForRetrieverRun
-    ) -> List[Document]:
-        logger.warning("inside retrievers.py inside _get_relevant_documents")
-        if not self.es_client or not self.document_mapper:
-            raise ValueError("OpenSearch client or document mapper is not initialized")
-
-        body = self.body_func(query)
-        logger.info(body)
-        response = self.es_client.search(index=self.index_name, body=body)
-        return [self.document_mapper(hit) for hit in response["hits"]["hits"]]
-
-    def _single_field_mapper(self, hit: Mapping[str, Any]) -> Document:
-        content = hit["_source"].pop(self.content_field)
-        return Document(page_content=content, metadata=hit)
-
-    def _multi_field_mapper(self, hit: Mapping[str, Any]) -> Document:
-        self.content_field = cast(Mapping, self.content_field)
-        field = self.content_field[hit["_index"]]
-        content = hit["_source"].pop(field)
-        return Document(page_content=content, metadata=hit)
-
 
 def hit_to_doc(hit: dict[str, Any]) -> Document:
     """
@@ -124,7 +50,7 @@ def hit_to_doc(hit: dict[str, Any]) -> Document:
         | source["metadata"],
     )
 
-
+@catch_403
 def query_to_documents(es_client: Union[Elasticsearch, OpenSearch], index_name: str, query: dict[str, Any]) -> list[Document]:
     """Runs an Elasticsearch query and returns Documents."""
     logger.warning("inside retrievers.py inside query_to_documents")
@@ -185,6 +111,7 @@ class OpenSearchRetriever(BaseRetriever):
         elif isinstance(self.content_field, Mapping):
             self.document_mapper = self._multi_field_mapper
 
+    @catch_403
     @staticmethod
     def from_os_params(
         self,
@@ -203,6 +130,7 @@ class OpenSearchRetriever(BaseRetriever):
         es_client = self.es_client
         return OpenSearchRetriever(es_client=es_client, index_name=index_name, body_func=body_func, content_field=content_field, document_mapper=document_mapper)
 
+    @catch_403
     def _get_relevant_documents(self, query: str, *, run_manager: CallbackManagerForRetrieverRun) -> List[Document]:
         logger.warning("inside retrievers.py inside _get_relevant_documents")
         if not self.es_client or not self.document_mapper:
@@ -232,6 +160,7 @@ class ParameterisedElasticsearchRetriever(BaseRetriever):
     embedding_field_name: str = "embedding"
     chunk_resolution: ChunkResolution = ChunkResolution.normal
 
+    @catch_403
     def _get_relevant_documents(
         self, query: RedboxState, *, run_manager: CallbackManagerForRetrieverRun
     ) -> list[Document]:
@@ -295,6 +224,7 @@ class AllElasticsearchRetriever(OpenSearchRetriever):
         super().__init__(**kwargs)
         self.body_func = partial(get_all, self.chunk_resolution)
 
+    @catch_403
     def _get_relevant_documents(
         self, query: RedboxState, *, run_manager: CallbackManagerForRetrieverRun
     ) -> list[Document]:  # noqa:ARG002
@@ -331,6 +261,7 @@ class MetadataRetriever(OpenSearchRetriever):
         super().__init__(**kwargs)
         self.body_func = partial(get_metadata, self.chunk_resolution)
 
+    @catch_403
     def _get_relevant_documents(
         self, query: RedboxState, *, run_manager: CallbackManagerForRetrieverRun
     ) -> list[Document]:  # noqa:ARG002

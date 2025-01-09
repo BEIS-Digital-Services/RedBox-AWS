@@ -7,7 +7,7 @@ from redbox_app.setting_enums import Environment
 from redbox.chains.components import get_embeddings
 from redbox.chains.ingest import ingest_from_loader
 from redbox.loader.loaders import MetadataLoader, UnstructuredChunkLoader
-from redbox.models.settings import get_settings
+from redbox.models.settings import get_settings, catch_403
 from redbox.models.file import ChunkResolution
 import environ
 from langchain_core.exceptions import OutputParserException
@@ -47,6 +47,8 @@ def clean_json_metadata(raw_metadata: str) -> str:
             raise ValueError("No JSON object found in metadata.")
     except json.JSONDecodeError as e:
         raise OutputParserException(f"Failed to parse metadata JSON: {e}")
+
+@catch_403
 def get_elasticsearch_store(es, es_index_name: str):
     #return ElasticsearchStore(
     #    index_name=es_index_name,
@@ -63,6 +65,8 @@ def get_elasticsearch_store(es, es_index_name: str):
         query_field="text",
         vector_query_field=env.embedding_document_field_name,
     )
+
+@catch_403
 def get_elasticsearch_store_without_embeddings(es, es_index_name: str):
     #return ElasticsearchStore(
     #    index_name=es_index_name,
@@ -78,6 +82,8 @@ def get_elasticsearch_store_without_embeddings(es, es_index_name: str):
         opensearch_url = opensearch_url,
         embedding_function=get_embeddings(env),
     )
+
+@catch_403
 def create_alias(alias: str):
     log.warning("inside ingester.py inside create_alias")
     es = env.elasticsearch_client()
@@ -86,6 +92,7 @@ def create_alias(alias: str):
     es.indices.create(index=chunk_index_name, ignore=400)
     es.indices.put_alias(index=chunk_index_name, name=alias)
 
+@catch_403
 def _ingest_file(file_name: str, es_index_name: str = alias):
     log.warning("inside ingester.py inside _ingest_file")
     logging.warning("Ingesting file: %s", file_name)
@@ -97,9 +104,11 @@ def _ingest_file(file_name: str, es_index_name: str = alias):
             create_alias(alias)
     else:
         es.indices.create(index=es_index_name, ignore=400)
+
     # Extract metadata
     metadata_loader = MetadataLoader(env=env, s3_client=env.s3_client(), file_name=file_name)
     raw_metadata = metadata_loader.extract_metadata()
+
     try:
         # Ensure `raw_metadata` is converted to a JSON string if it's an object
         if isinstance(raw_metadata, dict) or hasattr(raw_metadata, "dict"):
@@ -111,6 +120,7 @@ def _ingest_file(file_name: str, es_index_name: str = alias):
     except OutputParserException as e:
         logging.error(f"Failed to clean metadata: {e}")
         raise
+
     # Initialize chunk_ingest_chain
     vectorstore_normal = get_elasticsearch_store(es, es_index_name)
     logging.warning(f"Vectorstore (normal) initialized: {vectorstore_normal}")
@@ -127,6 +137,7 @@ def _ingest_file(file_name: str, es_index_name: str = alias):
         vectorstore=vectorstore_normal,
         env=env,
     )
+
     # Initialize large_chunk_ingest_chain
     vectorstore_large = get_elasticsearch_store_without_embeddings(es, es_index_name)
     logging.warning(f"Vectorstore (large) initialized: {vectorstore_large}")
@@ -152,6 +163,8 @@ def _ingest_file(file_name: str, es_index_name: str = alias):
         file_name,
         {k: len(v) for k, v in new_ids.items()},
     )
+
+@catch_403
 def ingest_file(file_name: str, es_index_name: str = alias) -> str | None:
     try:
         _ingest_file(file_name, es_index_name)

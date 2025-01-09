@@ -1,13 +1,13 @@
 import logging
 import os
-from functools import cache, lru_cache
+from functools import cache, lru_cache, wraps
 from typing import Literal, Union
-
 import boto3
 import environ
 from elasticsearch import Elasticsearch
 from openai import max_retries
 from opensearchpy import AWSV4SignerAuth, OpenSearch, RequestsHttpConnection
+from opensearchpy.exceptions import AuthorizationException
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from redbox_app.setting_enums import Environment
@@ -18,6 +18,19 @@ logger = logging.getLogger()
 logger.warning("inside settings.py")
 env = environ.Env()
 ENVIRONMENT = Environment[env.str("ENVIRONMENT").upper()]
+
+def catch_403(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except AuthorizationException as e:
+            logger.error(f"403 Authorization Error in function '{func.__name__}': {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Other Error in function '{func.__name__}': {e}")
+            raise
+    return wrapper
 
 
 class OpenSearchSettings(BaseModel):
@@ -150,7 +163,8 @@ class Settings(BaseSettings):
     @property
     def elastic_alias(self):
         return self.elastic_root_index + "-chunk-current"
-
+    
+    @catch_403
     @lru_cache(1)
     def elasticsearch_client(self) -> Union[Elasticsearch, OpenSearch]:
         logger.warning("inside settings.py inside elasticsearch_client")
