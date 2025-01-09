@@ -27,6 +27,7 @@ from redbox.transform import (
     sort_documents,
     structure_documents_by_group_and_indices,
 )
+from redbox.models.settings import catch_403
 
 import logging
 
@@ -79,7 +80,7 @@ def has_injected_state(tool: StructuredTool) -> bool:
 
     return False
 
-
+@catch_403
 def build_search_documents_tool(
     es_client: Union[Elasticsearch, OpenSearch],
     index_name: str,

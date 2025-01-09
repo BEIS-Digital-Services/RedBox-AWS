@@ -15,7 +15,7 @@ from langchain_openai.embeddings import AzureOpenAIEmbeddings, OpenAIEmbeddings
 
 
 from redbox.chains.parser import StreamingJsonOutputParser
-from redbox.models.settings import ChatLLMBackend, Settings
+from redbox.models.settings import ChatLLMBackend, Settings, catch_403
 from redbox.retriever import AllElasticsearchRetriever, ParameterisedElasticsearchRetriever, OpenSearchRetriever, MetadataRetriever
 from langchain_community.embeddings import BedrockEmbeddings
 from langchain.chat_models import init_chat_model
@@ -82,7 +82,7 @@ def get_embeddings(env: Settings) -> Embeddings:
         return get_aws_embeddings(env)
     raise Exception("No configured embedding model")
 
-
+@catch_403
 def get_all_chunks_retriever(env: Settings) -> OpenSearchRetriever:
     logger.warning("inside components.py get_all_chunks_retriever")
     return AllElasticsearchRetriever(
@@ -90,7 +90,7 @@ def get_all_chunks_retriever(env: Settings) -> OpenSearchRetriever:
         index_name=env.elastic_chunk_alias,
     )
 
-
+@catch_403
 def get_parameterised_retriever(env: Settings, embeddings: Embeddings | None = None):
     """Creates an Elasticsearch retriever runnable.
 
@@ -106,7 +106,7 @@ def get_parameterised_retriever(env: Settings, embeddings: Embeddings | None = N
         embedding_field_name=env.embedding_document_field_name,
     )
 
-
+@catch_403
 def get_metadata_retriever(env: Settings):
     logger.warning("inside components.py inside get_metadata_retriever")
     return MetadataRetriever(
