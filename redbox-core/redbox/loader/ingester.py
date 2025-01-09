@@ -11,17 +11,22 @@ from redbox.models.settings import get_settings, catch_403
 from redbox.models.file import ChunkResolution
 import environ
 from langchain_core.exceptions import OutputParserException
+from opensearchpy.exceptions import AuthorizationException
 import json
 import re
 if TYPE_CHECKING:
     from mypy_boto3_s3.client import S3Client
 else:
     S3Client = object
+
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger()
+
 log.warning("inside ingester.py")
+
 env = get_settings()
 env_vars = environ.Env()
+
 ENVIRONMENT = Environment[env_vars.str("ENVIRONMENT").upper()]
 alias = env.elastic_chunk_alias
 if ENVIRONMENT.is_local:
@@ -95,15 +100,26 @@ def create_alias(alias: str):
 @catch_403
 def _ingest_file(file_name: str, es_index_name: str = alias):
     log.warning("inside ingester.py inside _ingest_file")
-    logging.warning("Ingesting file: %s", file_name)
+    log.warning("Ingesting file: %s", file_name)
     es = env.elasticsearch_client()
-    if es_index_name == alias:
-        if not es.indices.exists_alias(index="_all", name=alias):
-            logging.info("The alias does not exist")
-            logging.info(f"Alias: {alias}, Exists: {es.indices.exists_alias(name=alias)}")
-            create_alias(alias)
-    else:
-        es.indices.create(index=es_index_name, ignore=400)
+
+    try:
+        log.warning("Checking alias existence...")
+        if es_index_name == alias:
+            exists = es.indices.exists_alias(name=alias)
+            log.warning(f"Alias check result: {exists}")
+            if not exists:
+                log.warning("The alias does not exist")
+                log.warning(f"Alias: {alias}, Exists: {exists}")
+                create_alias(alias)
+        else:
+            es.indices.create(index=es_index_name, ignore=400)
+    except AuthorizationException as e:
+        log.error(f"403 Authorization Error in _ingest_file when checking or creating alias: {e}")
+        raise
+    except Exception as e:
+        log.error(f"Other Error in _ingest_file when checking or creating alias: {e}")
+        raise
 
     # Extract metadata
     metadata_loader = MetadataLoader(env=env, s3_client=env.s3_client(), file_name=file_name)
@@ -116,14 +132,14 @@ def _ingest_file(file_name: str, es_index_name: str = alias):
         else:
             raw_metadata_json = str(raw_metadata)
         metadata = clean_json_metadata(raw_metadata_json)
-        logging.warning(f"Cleaned metadata: {metadata}")
+        log.warning(f"Cleaned metadata: {metadata}")
     except OutputParserException as e:
-        logging.error(f"Failed to clean metadata: {e}")
+        log.error(f"Failed to clean metadata: {e}")
         raise
 
     # Initialize chunk_ingest_chain
     vectorstore_normal = get_elasticsearch_store(es, es_index_name)
-    logging.warning(f"Vectorstore (normal) initialized: {vectorstore_normal}")
+    log.warning(f"Vectorstore (normal) initialized: {vectorstore_normal}")
     chunk_ingest_chain = ingest_from_loader(
         loader=UnstructuredChunkLoader(
             chunk_resolution=ChunkResolution.normal,
@@ -140,7 +156,7 @@ def _ingest_file(file_name: str, es_index_name: str = alias):
 
     # Initialize large_chunk_ingest_chain
     vectorstore_large = get_elasticsearch_store_without_embeddings(es, es_index_name)
-    logging.warning(f"Vectorstore (large) initialized: {vectorstore_large}")
+    log.warning(f"Vectorstore (large) initialized: {vectorstore_large}")
     large_chunk_ingest_chain = ingest_from_loader(
         loader=UnstructuredChunkLoader(
             chunk_resolution=ChunkResolution.largest,
@@ -156,9 +172,16 @@ def _ingest_file(file_name: str, es_index_name: str = alias):
     )
 
     # Process the chains
-    new_ids = RunnableParallel({"normal": chunk_ingest_chain, "largest": large_chunk_ingest_chain}).invoke(file_name)
+    try:
+        new_ids = RunnableParallel({"normal": chunk_ingest_chain, "largest": large_chunk_ingest_chain}).invoke(file_name)
+    except AuthorizationException as e:
+        log.error(f"403 Authorization Error in _ingest_file during RunnableParallel: {e}")
+        raise
+    except Exception as e:
+        log.error(f"Other Error in _ingest_file during RunnableParallel: {e}")
+        raise
 
-    logging.warning(
+    log.warning(
         "File: %s %s chunks ingested",
         file_name,
         {k: len(v) for k, v in new_ids.items()},
