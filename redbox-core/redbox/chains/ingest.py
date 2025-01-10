@@ -12,6 +12,7 @@ from redbox.loader.loaders import UnstructuredChunkLoader
 from redbox.models.settings import Settings
 from opensearchpy.exceptions import AuthorizationException
 from botocore.exceptions import ClientError
+import uuid
 
 if TYPE_CHECKING:
     from mypy_boto3_s3.client import S3Client
@@ -85,7 +86,20 @@ def ingest_from_loader(
                 #index_exists = vectorstore.client.indices.exists(index="redbox-data-chunk")
                 #log.warning(f"Index exists check: {index_exists}")
                 
-                return vectorstore.add_documents(docs, create_index_if_not_exists=False)
+                #return vectorstore.add_documents(docs, create_index_if_not_exists=False)
+                body = []
+                for doc in docs:
+                    body.append({"index": {"_index": "redbox-data-chunk", "_id": doc.metadata.get("id", str(uuid.uuid4()))}})
+                    body.append({"text": doc.page_content, "metadata": doc.metadata})
+                response = vectorstore.client.bulk(body=body)
+
+                # Extract IDs from the bulk response to match the behavior of `add_documents`
+                document_ids = [
+                    item["index"].get("_id") for item in response["items"] if "index" in item
+                ]
+
+                return document_ids
+
             except AuthorizationException as e:
                 log.error(f"403 Authorization Error in vectorstore.add_documents: {e}")
                 raise
