@@ -15,6 +15,7 @@ from django.views import View
 from django.views.decorators.http import require_http_methods
 from django_q.tasks import async_task
 
+from django.conf import settings
 from redbox_app.redbox_core.models import File
 from redbox_app.worker import ingest
 
@@ -64,6 +65,7 @@ class DocumentView(View):
                 "completed_files": completed_files,
                 "processing_files": processing_files,
                 "ingest_errors": ingest_errors,
+                "contact_email": settings.CONTACT_EMAIL, "version": settings.REDBOX_VERSION
             },
         )
 
