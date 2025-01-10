@@ -17,6 +17,7 @@ import re
 import boto3
 from opensearchpy import AWSV4SignerAuth
 from requests_aws4auth import AWS4Auth
+from requests.auth import AuthBase
 
 if TYPE_CHECKING:
     from mypy_boto3_s3.client import S3Client
@@ -32,21 +33,29 @@ env = get_settings()
 env_vars = environ.Env()
 
 ENVIRONMENT = Environment[env_vars.str("ENVIRONMENT").upper()]
+
 alias = env.elastic_chunk_alias
+
+class RequestsAuthWrapper(AuthBase):
+    def __init__(self, signer):
+        self.signer = signer
+
+    def __call__(self, request):
+        # Apply the signer (which expects a request object)
+        return self.signer(request)
+
 if ENVIRONMENT.is_local:
     opensearch_url="https://localhost:9200"
 else:
     opensearch_url = f"https://{env_vars.str('OPENSEARCH_HOST')}"
+
     session = boto3.Session()
     credentials = session.get_credentials()
     region = "eu-west-2"
-    auth = AWS4Auth(
-        credentials.access_key,
-        credentials.secret_key,
-        region,
-        "es",
-        session_token=credentials.token,
-    )
+    auth = AWSV4SignerAuth(credentials.get_frozen_credentials(), region)
+    wrapped_auth = RequestsAuthWrapper(auth)
+
+    
     #opensearch_host = env_vars.str('OPENSEARCH_HOST')  # Ensure this includes the endpoint
     #username = env_vars.str('OPENSEARCH_USER')
     #password = env_vars.str('OPENSEARCH_PASSWORD')
@@ -80,7 +89,7 @@ def get_elasticsearch_store(es, es_index_name: str):
         embedding=get_embeddings(env),
         es_connection=es,
         opensearch_url = opensearch_url,
-        http_auth=auth,
+        http_auth=wrapped_auth,
         embedding_function=get_embeddings(env),
         query_field="text",
         vector_query_field=env.embedding_document_field_name,
@@ -98,7 +107,7 @@ def get_elasticsearch_store_without_embeddings(es, es_index_name: str):
         index_name=es_index_name,
         es_connection=es,
         opensearch_url = opensearch_url,
-        http_auth=auth,
+        http_auth=wrapped_auth,
         query_field="text",
         strategy=BM25Strategy(),
         embedding_function=get_embeddings(env),
