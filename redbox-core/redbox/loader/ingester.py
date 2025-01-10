@@ -18,6 +18,7 @@ import boto3
 from opensearchpy import AWSV4SignerAuth
 from requests_aws4auth import AWS4Auth
 from requests.auth import AuthBase
+from requests.models import PreparedRequest
 
 if TYPE_CHECKING:
     from mypy_boto3_s3.client import S3Client
@@ -36,13 +37,21 @@ ENVIRONMENT = Environment[env_vars.str("ENVIRONMENT").upper()]
 
 alias = env.elastic_chunk_alias
 
-class RequestsAuthWrapper(AuthBase):
+class CustomAuthWrapper:
     def __init__(self, signer):
         self.signer = signer
 
-    def __call__(self, request):
-        # Apply the signer (which expects a request object)
-        return self.signer(request)
+    def __call__(self, method, url, body=None, headers=None):
+        # Create a dummy request object to pass to the signer
+        request = PreparedRequest()
+        request.method = method
+        request.url = url
+        request.body = body
+        request.headers = headers or {}
+
+        # Sign the request and return signed headers
+        signed_request = self.signer(request)
+        return signed_request.method, signed_request.url, signed_request.body, signed_request.headers
 
 if ENVIRONMENT.is_local:
     opensearch_url="https://localhost:9200"
@@ -53,7 +62,7 @@ else:
     credentials = session.get_credentials()
     region = "eu-west-2"
     auth = AWSV4SignerAuth(credentials.get_frozen_credentials(), region)
-    wrapped_auth = RequestsAuthWrapper(auth)
+    wrapped_auth = CustomAuthWrapper(auth)
 
     
     #opensearch_host = env_vars.str('OPENSEARCH_HOST')  # Ensure this includes the endpoint
