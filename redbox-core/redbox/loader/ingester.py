@@ -14,6 +14,9 @@ from langchain_core.exceptions import OutputParserException
 from opensearchpy.exceptions import AuthorizationException
 import json
 import re
+import boto3
+from opensearchpy import AWSV4SignerAuth
+
 if TYPE_CHECKING:
     from mypy_boto3_s3.client import S3Client
 else:
@@ -33,6 +36,9 @@ if ENVIRONMENT.is_local:
     opensearch_url="https://localhost:9200"
 else:
     opensearch_url = f"https://{env_vars.str('OPENSEARCH_HOST')}"
+    credentials = boto3.Session().get_credentials()
+    credentials = credentials.get_frozen_credentials()
+    auth = AWSV4SignerAuth(credentials, "eu-west-2")
     #opensearch_host = env_vars.str('OPENSEARCH_HOST')  # Ensure this includes the endpoint
     #username = env_vars.str('OPENSEARCH_USER')
     #password = env_vars.str('OPENSEARCH_PASSWORD')
@@ -66,6 +72,7 @@ def get_elasticsearch_store(es, es_index_name: str):
         embedding=get_embeddings(env),
         es_connection=es,
         opensearch_url = opensearch_url,
+        http_auth=auth,
         embedding_function=get_embeddings(env),
         query_field="text",
         vector_query_field=env.embedding_document_field_name,
@@ -82,9 +89,10 @@ def get_elasticsearch_store_without_embeddings(es, es_index_name: str):
     return OpenSearchVectorSearch(
         index_name=es_index_name,
         es_connection=es,
+        opensearch_url = opensearch_url,
+        http_auth=auth,
         query_field="text",
         strategy=BM25Strategy(),
-        opensearch_url = opensearch_url,
         embedding_function=get_embeddings(env),
     )
 
