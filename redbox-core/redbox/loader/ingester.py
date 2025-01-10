@@ -37,21 +37,23 @@ ENVIRONMENT = Environment[env_vars.str("ENVIRONMENT").upper()]
 
 alias = env.elastic_chunk_alias
 
-class CustomAuthWrapper:
+class CustomAuthWrapper(AuthBase):
     def __init__(self, signer):
         self.signer = signer
 
     def __call__(self, method, url, body=None, headers=None):
-        # Create a dummy request object to pass to the signer
+        # Build a request object compatible with the AWSV4SignerAuth
         request = PreparedRequest()
         request.method = method
         request.url = url
         request.body = body
         request.headers = headers or {}
 
-        # Sign the request and return signed headers
+        # Sign the request
         signed_request = self.signer(request)
-        return signed_request.method, signed_request.url, signed_request.body, signed_request.headers
+
+        # Extract the signed headers (we only want to return the headers)
+        return signed_request.headers
 
 if ENVIRONMENT.is_local:
     opensearch_url="https://localhost:9200"
