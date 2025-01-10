@@ -16,6 +16,7 @@ import json
 import re
 import boto3
 from opensearchpy import AWSV4SignerAuth
+from requests_aws4auth import AWS4Auth
 
 if TYPE_CHECKING:
     from mypy_boto3_s3.client import S3Client
@@ -36,9 +37,16 @@ if ENVIRONMENT.is_local:
     opensearch_url="https://localhost:9200"
 else:
     opensearch_url = f"https://{env_vars.str('OPENSEARCH_HOST')}"
-    credentials = boto3.Session().get_credentials()
-    credentials = credentials.get_frozen_credentials()
-    auth = AWSV4SignerAuth(credentials, "eu-west-2")
+    session = boto3.Session()
+    credentials = session.get_credentials()
+    region = "eu-west-2"
+    auth = AWS4Auth(
+        credentials.access_key,
+        credentials.secret_key,
+        region,
+        "es",
+        session_token=credentials.token,
+    )
     #opensearch_host = env_vars.str('OPENSEARCH_HOST')  # Ensure this includes the endpoint
     #username = env_vars.str('OPENSEARCH_USER')
     #password = env_vars.str('OPENSEARCH_PASSWORD')
