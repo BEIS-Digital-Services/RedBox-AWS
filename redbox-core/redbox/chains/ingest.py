@@ -80,8 +80,8 @@ def ingest_from_loader(
 
                 log.warning(f"Client host: {vectorstore.client.transport.hosts}")
 
-                index_exists = vectorstore.client.indices.exists(index="redbox-data-chunk")
-                log.warning(f"Index exists check: {index_exists}")
+                #index_exists = vectorstore.client.indices.exists(index="redbox-data-chunk")
+                #log.warning(f"Index exists check: {index_exists}")
                 
                 return vectorstore.add_documents(docs, create_index_if_not_exists=False)
             except AuthorizationException as e:
