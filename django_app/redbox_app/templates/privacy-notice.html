@@ -7,9 +7,9 @@
   {% set department_address = "Department for Business and Trade, Old Admiralty Building, Admiralty Place, London, SW1A 2DY" %}
   {% set last_updated = "21st June 2024" %}
 {% else %}
-  {% set departmental_owner = "Cabinet Office" %}
-  {% set department_address = "Cabinet Office, 70 Whitehall, London, SW1A 2AS, or 0207 276 1234, or <a href='mailto:publiccorrespondence@cabinetoffice.gov.uk' class='govuk-link'>publiccorrespondence@cabinetoffice.gov.uk</a>" %}
-  {% set last_updated = "16th April 2024" %}
+  {% set departmental_owner = "dsit" %}
+  {% set department_address = "Department for Science, Innovation and Technology, 100 Parliament Street, London, SW1A 2BQ, United Kingdom" %}
+  {% set last_updated = "10th Jannuary 2025" %}
 {% endif %}
 
 {% block content %}
@@ -65,7 +65,6 @@
 
       <h3 class="govuk-heading-s">Contact details</h3>
       <p class="govuk-body">The data controller for your personal data is the {{ departmental_owner }}. The contact details for the data controller are: {{ department_address | safe }}.</p>
-      <p class="govuk-body">The contact details for the data controller's Data Protection Officer are: <a href="mailto:dpo@cabinetoffice.gov.uk" class="govuk-link">dpo@cabinetoffice.gov.uk</a>.</p>
       <p class="govuk-body">The Data Protection Officer provides independent advice and monitoring of {{ departmental_owner }}'s use of personal information.</p>
 
       <h2 class="govuk-heading-m">Changes to this notice</h2>

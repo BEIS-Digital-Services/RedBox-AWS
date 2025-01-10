@@ -383,7 +383,7 @@ LOGGING = {
 # Email
 EMAIL_BACKEND_TYPE = env.str("EMAIL_BACKEND_TYPE")
 FROM_EMAIL = env.str("FROM_EMAIL")
-CONTACT_EMAIL = env.str("CONTACT_EMAIL")
+CONTACT_EMAIL = "https://teams.microsoft.com/l/channel/19%3A8a6ce8665e6d48a691d1edb8c403c4cf%40thread.tacv2/Technical%20problems?groupId=14df8cd5-f24f-48f7-abfb-0c9e2e3e3fc8"
 
 if EMAIL_BACKEND_TYPE == "FILE":
     EMAIL_BACKEND = "django.core.mail.backends.filebased.EmailBackend"
