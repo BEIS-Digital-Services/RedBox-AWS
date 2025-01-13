@@ -175,7 +175,7 @@ class Settings(BaseSettings):
             port = 9200
         else:
             credentials = boto3.Session().get_credentials()
-            credentials = credentials.get_frozen_credentials()
+            #credentials = credentials.get_frozen_credentials()
 
             auth = AWSV4SignerAuth(credentials, "eu-west-2")
             use_ssl = True
