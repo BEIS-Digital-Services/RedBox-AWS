@@ -86,7 +86,7 @@ class UploadView(View):
             errors.append("No document selected")
 
         for uploaded_file in uploaded_files:
-            errors += self.validate_uploaded_file(uploaded_file)
+            errors += self.validate_uploaded_file(uploaded_file, request.user)
 
         if not errors:
             for uploaded_file in uploaded_files:
@@ -109,7 +109,7 @@ class UploadView(View):
         )
 
     @staticmethod
-    def validate_uploaded_file(uploaded_file: UploadedFile) -> Sequence[str]:
+    def validate_uploaded_file(uploaded_file: UploadedFile, user: User) -> Sequence[str]:
         errors: MutableSequence[str] = []
 
         if not uploaded_file.name:
@@ -125,35 +125,26 @@ class UploadView(View):
         if uploaded_file.size > MAX_FILE_SIZE:
             errors.append(f"Error with {uploaded_file.name}: File is larger than 200MB")
 
+        # Uniqueness check for that user
+        file_name = Path(uploaded_file.name).name.lower()
+        already_exists = File.objects.filter(
+            user=user, 
+            status__in=[File.Status.complete, File.Status.processing],
+            original_file__endswith=f"/{file_name}"
+        ).exists()
+
+        if already_exists:
+            errors.append(
+                f"Error with {uploaded_file.name}: This file was already uploaded. "
+                "Please rename it or delete the existing file."
+        )
+
         return errors
 
     @staticmethod
     def ingest_file(uploaded_file: UploadedFile, user: User) -> Sequence[str]:
         try:
-            # Generate a unique filename based on the uploaded file
-            original_name = uploaded_file.name
-            base_name, extension = Path(original_name).stem, Path(original_name).suffix
-            counter = 0
-            unique_name = f"{base_name}{extension}"
-    
-            # Check for conflicts in the database
-            while File.objects.filter(user=user, original_file=unique_name).exists():
-                counter += 1
-                unique_name = f"{base_name}({counter}){extension}"
-    
-            # Update the uploaded file's name
-            uploaded_file.name = unique_name
-
             logger.info("getting file from s3")
-
-            uploaded_file = InMemoryUploadedFile(
-                file=uploaded_file.file,  # File data stream
-                field_name="original_file",
-                name=unique_name,  # Set the updated (1), (2) filename explicitly
-                content_type=uploaded_file.content_type,
-                size=uploaded_file.size,
-                charset=uploaded_file.charset
-            )
             
             file = File.objects.create(
                 status=File.Status.processing.value,
@@ -161,8 +152,6 @@ class UploadView(View):
                 original_file=uploaded_file,
             )
 
-            #file.original_file.name = unique_name  # Explicitly set the final name after creation
-            #file.save()  # Save to ensure the updated name is stored
         except (ValueError, FieldError, ValidationError) as e:
             logger.exception("Error creating File model object for %s.", uploaded_file, exc_info=e)
             return e.args
