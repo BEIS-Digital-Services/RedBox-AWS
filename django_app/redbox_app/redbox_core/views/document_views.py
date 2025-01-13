@@ -129,6 +129,20 @@ class UploadView(View):
     @staticmethod
     def ingest_file(uploaded_file: UploadedFile, user: User) -> Sequence[str]:
         try:
+            # Generate a unique filename based on the uploaded file
+            original_name = uploaded_file.name
+            base_name, extension = Path(original_name).stem, Path(original_name).suffix
+            counter = 0
+            unique_name = f"{base_name}{extension}"
+    
+            # Check for conflicts in the database
+            while File.objects.filter(user=user, original_file=unique_name).exists():
+                counter += 1
+                unique_name = f"{base_name}({counter}){extension}"
+    
+            # Update the uploaded file's name
+            uploaded_file.name = unique_name
+
             logger.info("getting file from s3")
             file = File.objects.create(
                 status=File.Status.processing.value,
