@@ -15,8 +15,9 @@ from django.views import View
 from django.views.decorators.http import require_http_methods
 from django_q.tasks import async_task
 from django.core.files.uploadedfile import InMemoryUploadedFile
-
+from django.db.models import F
 from django.conf import settings
+
 from redbox_app.redbox_core.models import File
 from redbox_app.worker import ingest
 
@@ -127,6 +128,16 @@ class UploadView(View):
 
         # Uniqueness check for that user
         file_name = Path(uploaded_file.name).name.lower()
+
+        # Dump all "active" file records to see what the DB actually has
+        active_files = File.objects.filter(
+            user=user, 
+            status__in=[File.Status.complete, File.Status.processing],
+        ).values(original_file=F("original_file"), status=F("status"))
+        
+        logger.warning("For user=%s, active files in DB: %s", user.email, list(active_files))
+        logger.warning("Incoming upload filename: %r", file_name)
+
         already_exists = File.objects.filter(
             user=user, 
             status__in=[File.Status.complete, File.Status.processing],
