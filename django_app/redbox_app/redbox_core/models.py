@@ -551,7 +551,7 @@ def build_s3_key(instance, filename: str) -> str:
     If it exists, appends (1), (2), etc., to make it unique.
     """
     base_name, ext = os.path.splitext(filename)
-    existing_files = File.objects.filter(user=instance.user.email, original_file__startswith=f"{instance.user.email}/{base_name}").values_list('original_file', flat=True)
+    existing_files = File.objects.filter(user=instance.user, original_file__startswith=f"{base_name}").values_list('original_file', flat=True)
 
     counter = 1
     new_filename = filename
