@@ -130,10 +130,13 @@ class UploadView(View):
         file_name = Path(uploaded_file.name).name.lower()
 
         # Dump all "active" file records to see what the DB actually has
-        active_files = File.objects.filter(
-            user=user, 
-            status__in=[File.Status.complete, File.Status.processing],
-        ).values(original_file=F("original_file"), status=F("status"))
+        active_files = (
+            File.objects.filter(
+                user=user, 
+                status__in=[File.Status.complete, File.Status.processing],
+            )
+            .values("original_file", "status")
+        )
         
         logger.warning("For user=%s, active files in DB: %s", user.email, list(active_files))
         logger.warning("Incoming upload filename: %r", file_name)
