@@ -546,12 +546,20 @@ class InactiveFileError(ValueError):
 
 
 def build_s3_key(instance, filename: str) -> str:
-    """the s3-key is the primary key for a file,
-    this needs to be unique so that if a user uploads a file with the same name as
-    1. an existing file that they own, then it is overwritten
-    2. an existing file that another user owns then a new file is created
     """
-    return f"{instance.user.email}/{filename}"
+    Builds the S3 key by checking if a file with the same name already exists for this user.
+    If it exists, appends (1), (2), etc., to make it unique.
+    """
+    base_name, ext = os.path.splitext(filename)
+    existing_files = File.objects.filter(user=instance.user, original_file_name__startswith=base_name).values_list('original_file_name', flat=True)
+
+    counter = 1
+    new_filename = filename
+    while new_filename in existing_files:
+        new_filename = f"{base_name} ({counter}){ext}"
+        counter += 1
+
+    return f"{instance.user.email}/{new_filename}"
 
 
 class File(UUIDPrimaryKeyBase, TimeStampedModel):
