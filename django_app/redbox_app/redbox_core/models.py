@@ -551,7 +551,7 @@ def build_s3_key(instance, filename: str) -> str:
     If it exists, appends (1), (2), etc., to make it unique.
     """
     base_name, ext = os.path.splitext(filename)
-    existing_files = File.objects.filter(user=instance.user, original_file_name__startswith=base_name).values_list('original_file_name', flat=True)
+    existing_files = File.objects.filter(user=instance.user, original_file__startswith=f"{instance.user.email}/{base_name}").values_list('original_file', flat=True)
 
     counter = 1
     new_filename = filename
@@ -629,8 +629,8 @@ class File(UUIDPrimaryKeyBase, TimeStampedModel):
 
     @property
     def file_name(self) -> str:
-        if self.original_file_name:  # delete me?
-            return self.original_file_name
+        #if self.original_file_name:  # delete me?
+        #    return self.original_file_name
 
         # could have a stronger (regex?) way of stripping the users email address?
         if "/" in self.original_file.name:
