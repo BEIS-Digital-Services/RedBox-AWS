@@ -138,13 +138,13 @@ class UploadView(View):
             .values("original_file", "status")
         )
         
-        logger.warning("For user=%s, active files in DB: %s", user.email, list(active_files))
-        logger.warning("Incoming upload filename: %r", file_name)
+        #logger.warning("For user=%s, active files in DB: %s", user.email, list(active_files))
+        #logger.warning("Incoming upload filename: %r", file_name)
 
         already_exists = File.objects.filter(
             user=user, 
             status__in=[File.Status.complete, File.Status.processing],
-            original_file__endswith=f"/{file_name}"
+            original_file__iendswith=f"/{file_name}"
         ).exists()
 
         if already_exists:
