@@ -14,6 +14,7 @@ from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.http import require_http_methods
 from django_q.tasks import async_task
+from django.core.files.uploadedfile import InMemoryUploadedFile
 
 from django.conf import settings
 from redbox_app.redbox_core.models import File
@@ -144,11 +145,24 @@ class UploadView(View):
             uploaded_file.name = unique_name
 
             logger.info("getting file from s3")
+
+            uploaded_file = InMemoryUploadedFile(
+                file=uploaded_file.file,  # File data stream
+                field_name="original_file",
+                name=unique_name,  # Set the updated (1), (2) filename explicitly
+                content_type=uploaded_file.content_type,
+                size=uploaded_file.size,
+                charset=uploaded_file.charset
+            )
+            
             file = File.objects.create(
                 status=File.Status.processing.value,
                 user=user,
                 original_file=uploaded_file,
             )
+
+            #file.original_file.name = unique_name  # Explicitly set the final name after creation
+            #file.save()  # Save to ensure the updated name is stored
         except (ValueError, FieldError, ValidationError) as e:
             logger.exception("Error creating File model object for %s.", uploaded_file, exc_info=e)
             return e.args
