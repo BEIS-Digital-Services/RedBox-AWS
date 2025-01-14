@@ -14,6 +14,9 @@ from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.http import require_http_methods
 from django_q.tasks import async_task
+from django.core.files.uploadedfile import InMemoryUploadedFile
+from django.db.models import F
+from django.conf import settings
 
 from redbox_app.redbox_core.models import File
 from redbox_app.worker import ingest
@@ -64,6 +67,7 @@ class DocumentView(View):
                 "completed_files": completed_files,
                 "processing_files": processing_files,
                 "ingest_errors": ingest_errors,
+                "contact_email": settings.CONTACT_EMAIL, "version": settings.REDBOX_VERSION
             },
         )
 
@@ -83,7 +87,7 @@ class UploadView(View):
             errors.append("No document selected")
 
         for uploaded_file in uploaded_files:
-            errors += self.validate_uploaded_file(uploaded_file)
+            errors += self.validate_uploaded_file(uploaded_file, request.user)
 
         if not errors:
             for uploaded_file in uploaded_files:
@@ -106,7 +110,7 @@ class UploadView(View):
         )
 
     @staticmethod
-    def validate_uploaded_file(uploaded_file: UploadedFile) -> Sequence[str]:
+    def validate_uploaded_file(uploaded_file: UploadedFile, user: User) -> Sequence[str]:
         errors: MutableSequence[str] = []
 
         if not uploaded_file.name:
@@ -122,17 +126,48 @@ class UploadView(View):
         if uploaded_file.size > MAX_FILE_SIZE:
             errors.append(f"Error with {uploaded_file.name}: File is larger than 200MB")
 
+        # Uniqueness check for that user
+        file_name = Path(uploaded_file.name).name.lower()
+
+        # Dump all "active" file records to see what the DB actually has
+        active_files = (
+            File.objects.filter(
+                user=user, 
+                status__in=[File.Status.complete, File.Status.processing],
+            )
+            .values("original_file", "status")
+        )
+        
+        #logger.warning("For user=%s, active files in DB: %s", user.email, list(active_files))
+        #logger.warning("Incoming upload filename: %r", file_name)
+
+        normalized_file_name = uploaded_file.name.replace(" ", "_").lower()
+
+        already_exists = File.objects.filter(
+            user=user, 
+            status__in=[File.Status.complete, File.Status.processing],
+            original_file__iendswith=f"/{normalized_file_name}"
+        ).exists()
+
+        if already_exists:
+            errors.append(
+                f"Error with {uploaded_file.name}: This file was already uploaded. "
+                "Please rename it or delete the existing file."
+        )
+
         return errors
 
     @staticmethod
     def ingest_file(uploaded_file: UploadedFile, user: User) -> Sequence[str]:
         try:
             logger.info("getting file from s3")
+            
             file = File.objects.create(
                 status=File.Status.processing.value,
                 user=user,
                 original_file=uploaded_file,
             )
+
         except (ValueError, FieldError, ValidationError) as e:
             logger.exception("Error creating File model object for %s.", uploaded_file, exc_info=e)
             return e.args

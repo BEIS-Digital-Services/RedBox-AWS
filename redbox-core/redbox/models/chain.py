@@ -8,7 +8,7 @@ from langchain_core.documents import Document
 from langchain_core.messages import ToolCall
 from langgraph.graph import MessagesState
 from langgraph.managed.is_last_step import RemainingStepsManager
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
 from redbox.models import prompts
 from redbox.models.settings import ChatLLMBackend
@@ -387,4 +387,11 @@ class GeneratedMetadata(BaseModel):
 
     name: str = Field(description="document name", default="")
     description: str | None = Field(description="document description", default=None)
-    keywords: list[str] = Field(description="document keywords", max_length=5, default_factory=list)
+    keywords: list[str] = Field(description="document keywords", default_factory=list)
+
+    @validator("keywords", pre=True, always=True)
+    def truncate_keywords(cls, v):
+        # Ensure the keywords list is truncated to at most 5 items
+        if isinstance(v, list) and len(v) > 5:
+            return v[:5]
+        return v

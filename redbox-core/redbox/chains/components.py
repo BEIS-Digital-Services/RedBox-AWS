@@ -1,11 +1,11 @@
 import logging
-
 import os
 from functools import cache
 
 import tiktoken
-
 from dotenv import load_dotenv
+from langchain.chat_models import init_chat_model
+from langchain_community.embeddings import BedrockEmbeddings
 from langchain_core.embeddings import Embeddings, FakeEmbeddings
 from langchain_core.tools import StructuredTool
 from langchain_core.runnables import Runnable
@@ -15,14 +15,15 @@ from langchain_openai.embeddings import AzureOpenAIEmbeddings, OpenAIEmbeddings
 
 
 from redbox.chains.parser import StreamingJsonOutputParser
-from redbox.models.settings import ChatLLMBackend, Settings
-from redbox.retriever import AllElasticsearchRetriever, ParameterisedElasticsearchRetriever, MetadataRetriever
+from redbox.models.settings import ChatLLMBackend, Settings, catch_403
+from redbox.retriever import AllElasticsearchRetriever, ParameterisedElasticsearchRetriever, OpenSearchRetriever, MetadataRetriever
 from langchain_community.embeddings import BedrockEmbeddings
 from langchain.chat_models import init_chat_model
 from redbox.models.chain import StructuredResponseWithCitations
 
 
 logger = logging.getLogger(__name__)
+logger.warning("inside components.py")
 load_dotenv()
 
 
@@ -81,14 +82,15 @@ def get_embeddings(env: Settings) -> Embeddings:
         return get_aws_embeddings(env)
     raise Exception("No configured embedding model")
 
-
-def get_all_chunks_retriever(env: Settings) -> ElasticsearchRetriever:
+@catch_403
+def get_all_chunks_retriever(env: Settings) -> OpenSearchRetriever:
+    logger.warning("inside components.py get_all_chunks_retriever")
     return AllElasticsearchRetriever(
         es_client=env.elasticsearch_client(),
         index_name=env.elastic_chunk_alias,
     )
 
-
+@catch_403
 def get_parameterised_retriever(env: Settings, embeddings: Embeddings | None = None):
     """Creates an Elasticsearch retriever runnable.
 
@@ -96,6 +98,7 @@ def get_parameterised_retriever(env: Settings, embeddings: Embeddings | None = N
 
     Runnable returns a list of Chunks.
     """
+    logger.warning("inside components.py inside get_parameterised_retriever")
     return ParameterisedElasticsearchRetriever(
         es_client=env.elasticsearch_client(),
         index_name=env.elastic_chunk_alias,
@@ -103,8 +106,9 @@ def get_parameterised_retriever(env: Settings, embeddings: Embeddings | None = N
         embedding_field_name=env.embedding_document_field_name,
     )
 
-
+@catch_403
 def get_metadata_retriever(env: Settings):
+    logger.warning("inside components.py inside get_metadata_retriever")
     return MetadataRetriever(
         es_client=env.elasticsearch_client(),
         index_name=env.elastic_chunk_alias,

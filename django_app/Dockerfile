@@ -1,5 +1,5 @@
 # npm
-FROM node:20 AS npm-packages
+FROM public.ecr.aws/docker/library/node:20 AS npm-packages
 
 WORKDIR /src
 
@@ -13,7 +13,7 @@ RUN npx parcel build
 
 
 # poetry
-FROM python:3.12-slim AS poetry-packages
+FROM public.ecr.aws/docker/library/python:3.12-slim AS poetry-packages
 
 RUN apt-get update && apt-get install --yes build-essential > /dev/null
 
@@ -33,7 +33,7 @@ RUN poetry bundle venv ./venv
 
 
 # app
-FROM python:3.12-slim
+FROM public.ecr.aws/docker/library/python:3.12-slim
 
 RUN apt-get update && apt-get install --yes libpq-dev curl > /dev/null
 

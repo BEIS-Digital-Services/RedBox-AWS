@@ -12,10 +12,22 @@ class Environment(StrEnum):
         obj.is_test = is_test
         obj.hosts = hosts
         return obj
-
+    
     @property
     def is_local(self) -> bool:
         return self is Environment.LOCAL
+    
+    @property
+    def is_dev(self) -> bool:
+        return self is Environment.DEV
+    
+    @property
+    def is_preprod(self) -> bool:
+        return self is Environment.PREPROD
+    
+    @property
+    def is_prod(self) -> bool:
+        return self is Environment.PROD
 
     @property
     def uses_minio(self) -> bool:
@@ -23,9 +35,9 @@ class Environment(StrEnum):
 
     LOCAL = ("LOCAL", True, [*LOCAL_HOSTS, *ADDITIONAL_HOSTS])  # nosec: B104: Not in prod
     INTEGRATION = ("INTEGRATION", True, [*LOCAL_HOSTS, *ADDITIONAL_HOSTS])  # nosec: B104: Not in prod
-    DEV = ("DEV", False, ["redbox-dev.ai.cabinetoffice.gov.uk", *ADDITIONAL_HOSTS])
-    PREPROD = ("PREPROD", False, ["redbox-preprod.ai.cabinetoffice.gov.uk", *ADDITIONAL_HOSTS])
-    PROD = ("PROD", False, ["redbox.ai.cabinetoffice.gov.uk", *ADDITIONAL_HOSTS])
+    DEV = ("DEV", False, ["dev.redbox.dsit.gov.uk", *ADDITIONAL_HOSTS])
+    PREPROD = ("PREPROD", False, ["staging.redbox.dsit.gov.uk", *ADDITIONAL_HOSTS])
+    PROD = ("PROD", False, ["redbox.dsit.gov.uk", *ADDITIONAL_HOSTS])
 
 
 class Classification(StrEnum):

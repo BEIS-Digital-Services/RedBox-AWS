@@ -18,13 +18,15 @@ from django.utils.translation import gettext_lazy as _
 from django_use_email_as_username.models import BaseUser, BaseUserManager
 from yarl import URL
 
-from redbox.models.settings import get_settings
+from redbox.models.settings import get_settings, catch_403
 from redbox_app.redbox_core.utils import get_date_group
 
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
 logger = logging.getLogger(__name__)
 
 env = get_settings()
+
+logger.warning("inside models.py")
 
 es_client = env.elasticsearch_client()
 
@@ -435,6 +437,7 @@ class User(BaseUser, UUIDPrimaryKeyBase):
         MORE_THAN_2_DAYS = "More than 2 days", _("More than 2 days")
         MORE_THAN_1_WEEK = "More than a week", _("More than a week")
 
+    USERNAME_FIELD = 'email'
     username = None
     password = models.CharField("password", max_length=128, blank=True, null=True)
     business_unit = models.CharField(null=True, blank=True, max_length=64, choices=BusinessUnit)
@@ -543,11 +546,10 @@ class InactiveFileError(ValueError):
 
 
 def build_s3_key(instance, filename: str) -> str:
-    """the s3-key is the primary key for a file,
-    this needs to be unique so that if a user uploads a file with the same name as
-    1. an existing file that they own, then it is overwritten
-    2. an existing file that another user owns then a new file is created
     """
+    Builds the S3 key by checking if a file with the same name already exists for this user.
+    """
+
     return f"{instance.user.email}/{filename}"
 
 
@@ -597,7 +599,9 @@ class File(UUIDPrimaryKeyBase, TimeStampedModel):
         """Manually deletes the file from S3 storage."""
         self.original_file.delete(save=False)
 
+    @catch_403
     def delete_from_elastic(self):
+        logger.warning("inside models.py inside delete_from_elastic")
         index = env.elastic_chunk_alias
         if es_client.indices.exists(index=index):
             es_client.delete_by_query(
@@ -616,8 +620,8 @@ class File(UUIDPrimaryKeyBase, TimeStampedModel):
 
     @property
     def file_name(self) -> str:
-        if self.original_file_name:  # delete me?
-            return self.original_file_name
+        #if self.original_file_name:  # delete me?
+        #    return self.original_file_name
 
         # could have a stronger (regex?) way of stripping the users email address?
         if "/" in self.original_file.name:
@@ -870,7 +874,7 @@ class ChatMessage(UUIDPrimaryKeyBase, TimeStampedModel):
         es_client.create(
             index=env.elastic_chat_mesage_index,
             id=uuid.uuid4(),
-            document=elastic_log_msg,
+            body=elastic_log_msg,
         )
 
     def unique_citation_uris(self) -> list[tuple[str, str]]:

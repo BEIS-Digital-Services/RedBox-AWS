@@ -1,17 +1,36 @@
 import logging
 import os
-from functools import cache, lru_cache
-from typing import Literal
-
+from functools import cache, lru_cache, wraps
+from typing import Literal, Union
 import boto3
+import environ
 from elasticsearch import Elasticsearch
-from opensearchpy import OpenSearch, RequestsHttpConnection
+from openai import max_retries
+from opensearchpy import AWSV4SignerAuth, OpenSearch, RequestsHttpConnection
+from opensearchpy.exceptions import AuthorizationException
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from redbox_app.setting_enums import Environment
 from langchain.globals import set_debug
 
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
 logger = logging.getLogger()
+logger.warning("inside settings.py")
+env = environ.Env()
+ENVIRONMENT = Environment[env.str("ENVIRONMENT").upper()]
+
+def catch_403(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except AuthorizationException as e:
+            logger.error(f"403 Authorization Error in function '{func.__name__}': {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Other Error in function '{func.__name__}': {e}")
+            raise
+    return wrapper
 
 
 class OpenSearchSettings(BaseModel):
@@ -19,7 +38,7 @@ class OpenSearchSettings(BaseModel):
 
     model_config = SettingsConfigDict(frozen=True)
 
-    collection_enpdoint: str
+    collection_endpoint: str = env.str("OPENSEARCH_HOST")
 
 
 class ElasticLocalSettings(BaseModel):
@@ -28,7 +47,7 @@ class ElasticLocalSettings(BaseModel):
     model_config = SettingsConfigDict(frozen=True)
 
     host: str = "elasticsearch"
-    port: int = 9200
+    port: int = 443
     scheme: str = "http"
     user: str = "elastic"
     version: str = "8.11.0"
@@ -59,7 +78,9 @@ class Settings(BaseSettings):
     embedding_openai_api_key: str = "NotAKey"
     embedding_azure_openai_endpoint: str = "not an endpoint"
     azure_api_version_embeddings: str = "2024-02-01"
-    metadata_extraction_llm: ChatLLMBackend = ChatLLMBackend(name="gpt-4o", provider="azure_openai")
+    metadata_extraction_llm: ChatLLMBackend = ChatLLMBackend(
+        name="gpt-4o", provider="azure_openai"
+    )
 
     embedding_backend: Literal[
         "text-embedding-ada-002",
@@ -81,7 +102,7 @@ class Settings(BaseSettings):
     partition_strategy: Literal["auto", "fast", "ocr_only", "hi_res"] = "fast"
     clustering_strategy: Literal["full"] | None = None
 
-    elastic: ElasticCloudSettings | ElasticLocalSettings | OpenSearchSettings = ElasticLocalSettings()
+    elastic: OpenSearchSettings = OpenSearchSettings()
     elastic_root_index: str = "redbox-data"
     elastic_chunk_alias: str = "redbox-data-chunk-current"
 
@@ -108,8 +129,12 @@ class Settings(BaseSettings):
     worker_ingest_largest_chunk_size: int = 300_000
     worker_ingest_largest_chunk_overlap: int = 0
 
-    response_no_doc_available: str = "No available data for selected files. They may need to be removed and added again"
-    response_max_content_exceeded: str = "Max content exceeded. Try smaller or fewer documents"
+    response_no_doc_available: str = (
+        "No available data for selected files. They may need to be removed and added again"
+    )
+    response_max_content_exceeded: str = (
+        "Max content exceeded. Try smaller or fewer documents"
+    )
 
     object_store: str = "minio"
 
@@ -118,17 +143,18 @@ class Settings(BaseSettings):
 
     unstructured_host: str = "unstructured"
 
-    model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", extra="allow", frozen=True)
+    model_config = SettingsConfigDict(
+        env_file=".env", env_nested_delimiter="__", extra="allow", frozen=True
+    )
 
     ## Prompts
     metadata_prompt: tuple = (
-        "system",
-        "You are an SEO specialist that must optimise the metadata of a document "
-        "to make it as discoverable as possible. You are about to be given the first "
-        "1_000 tokens of a document and any hard-coded file metadata that can be "
-        "recovered from it. Create SEO-optimised metadata for this document."
-        "Description must be less than 100 words. and no more than 5 keywords .",
-    )
+        {
+            "system", 
+            "You are an SEI specialist that must optimise the metadata of a document to make it as discoverable as possible. You are about to be given the first 1,000 tokens of a document and any hard-coded file metadata that can be recovered from it. Create SEI-optimised metadata for this document. Description must be less than 100 words and no more than 5 keywords. Respond strictly in valid JSON format. Do not include any additional text or commentary. Provide only the requested metadata as a JSON object."
+        }
+
+    ) 
 
     @property
     def elastic_chat_mesage_index(self):
@@ -137,42 +163,90 @@ class Settings(BaseSettings):
     @property
     def elastic_alias(self):
         return self.elastic_root_index + "-chunk-current"
-
+    
+    @catch_403
     @lru_cache(1)
-    def elasticsearch_client(self) -> Elasticsearch:
-        if isinstance(self.elastic, ElasticLocalSettings):
-            client = Elasticsearch(
-                hosts=[
-                    {
-                        "host": self.elastic.host,
-                        "port": self.elastic.port,
-                        "scheme": self.elastic.scheme,
-                    }
-                ],
-                basic_auth=(self.elastic.user, self.elastic.password),
-            )
-
-        elif isinstance(self.elastic, OpenSearchSettings):
-            client = OpenSearch(
-                hosts=[{"host": self.elastic.collection_enpdoint, "port": 443}],
-                use_ssl=True,
-                verify_certs=True,
-                connection_class=RequestsHttpConnection,
-                pool_maxsize=100,
-            )
-
+    def elasticsearch_client(self) -> Union[Elasticsearch, OpenSearch]:
+        logger.warning("inside settings.py inside elasticsearch_client")
+        if ENVIRONMENT.is_local:
+            auth = ("admin", "MyStrongPassword1!")
+            use_ssl = False
+            verify_certs = False
+            port = 9200
         else:
-            client = Elasticsearch(cloud_id=self.elastic.cloud_id, api_key=self.elastic.api_key)
+            credentials = boto3.Session().get_credentials()
+            #credentials = credentials.get_frozen_credentials()
 
-        if not client.indices.exists_alias(name=self.elastic_alias):
+            auth = AWSV4SignerAuth(credentials, "eu-west-2")
+            use_ssl = True
+            verify_certs = True
+            port = 443
+
+        opensearch_url = env.str('OPENSEARCH_HOST')
+
+        #if opensearch_url.startswith("https://"):
+        #    opensearch_url = opensearch_url[len("https://"):]
+ 
+        #OS_HOST = opensearch_url
+        #logger.warning(f"OpenSearch is={OS_HOST}")
+        #OS_PORT = port
+        #OS_USERNAME = env.str("OPENSEARCH_USER")
+        #OS_PASSWORD = env.str("OPENSEARCH_PASSWORD")
+        logger.warning("inside settings.py before client object created")
+
+        client = OpenSearch(
+            hosts=[{"host": env.str("OPENSEARCH_HOST"), "port": port}],
+            http_auth=auth,
+            #hosts=[{"host": OS_HOST, "port": OS_PORT}],
+            #http_auth=(OS_USERNAME, OS_PASSWORD),  # Basic Authentication
+            use_ssl=use_ssl,
+            verify_certs=verify_certs,
+            connection_class=RequestsHttpConnection,
+            pool_maxsize=100,
+            timeout=30,
+            max_retries=3,
+            retry_on_timeout=True,
+        )
+
+        logger.warning("inside settings.py before we print indices")
+
+        # List all indices in the OpenSearch collection
+        try:
+            indices = client.cat.indices(format="json")
+            print("Indices in the collection:")
+            for index in indices:
+                print(f"- {index['index']}")
+        except Exception as e:
+            print(f"Error fetching indices: {e}")
+
+        logger.warning("inside settings.py after we print indices")
+
+        logger.info(f"Client hosts: {client.transport.hosts}")
+        logger.info(f"Client connection class: {client.transport.connection_class}")
+
+        if not client.indices.exists_alias(
+            name=f"{self.elastic_root_index}-chunk-current"
+        ):
             chunk_index = f"{self.elastic_root_index}-chunk"
-            client.options(ignore_status=[400]).indices.create(index=chunk_index)
-            client.indices.put_alias(index=chunk_index, name=self.elastic_alias)
 
-        if not client.indices.exists(index=self.elastic_chat_mesage_index):
-            client.indices.create(index=self.elastic_chat_mesage_index)
+            # Ensure index creation does not raise an error if it already exists.
+            try:
+                client.indices.create(
+                    index=chunk_index, ignore=400
+                )  # 400 is ignored to avoid index-already-exists errors
+            except Exception as e:
+                logger.error(f"Failed to create index {chunk_index}: {e}")
 
-        return client.options(request_timeout=30, retry_on_timeout=True, max_retries=3)
+            try:
+                client.indices.put_alias(
+                    index=chunk_index, name=f"{self.elastic_root_index}-chunk-current"
+                )
+            except Exception as e:
+                logger.error(
+                    f"Failed to set alias {self.elastic_root_index}-chunk-current: {e}"
+                )
+
+        return client
 
     def s3_client(self):
         if self.object_store == "minio":

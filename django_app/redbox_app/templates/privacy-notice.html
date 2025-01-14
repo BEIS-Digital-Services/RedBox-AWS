@@ -7,9 +7,9 @@
   {% set department_address = "Department for Business and Trade, Old Admiralty Building, Admiralty Place, London, SW1A 2DY" %}
   {% set last_updated = "21st June 2024" %}
 {% else %}
-  {% set departmental_owner = "Cabinet Office" %}
-  {% set department_address = "Cabinet Office, 70 Whitehall, London, SW1A 2AS, or 0207 276 1234, or <a href='mailto:publiccorrespondence@cabinetoffice.gov.uk' class='govuk-link'>publiccorrespondence@cabinetoffice.gov.uk</a>" %}
-  {% set last_updated = "16th April 2024" %}
+  {% set departmental_owner = "dsit" %}
+  {% set department_address = "Department for Science, Innovation and Technology, 100 Parliament Street, London, SW1A 2BQ, United Kingdom" %}
+  {% set last_updated = "10th Jannuary 2025" %}
 {% endif %}
 
 {% block content %}
@@ -42,7 +42,7 @@
       </ul>
 
       <h3 class="govuk-heading-s">Recipients</h3>
-      <p class="govuk-body">Your personal data will be shared by us with analysts/researchers within the {{ departmental_owner }} if you have consented to be contacted further about Redbox.</p>
+      <p class="govuk-body">Your personal data will be shared by us with analysts/researchers within the department, if you have consented to be contacted further about Redbox.</p>
       <p class="govuk-body">As your personal data will be stored on our IT infrastructure it will also be shared with our data processors who provide email and document management and storage services.</p>
 
       <h3 class="govuk-heading-s">Retention</h3>
@@ -64,8 +64,7 @@
       <p class="govuk-body">If you consider that your personal data has been misused or mishandled, you may make a complaint to the Information Commissioner, who is an independent regulator. The Information Commissioner can be contacted at: Information Commissioner's Office, Wycliffe House, Water Lane, Wilmslow, Cheshire, SK9 5AF, or 0303 123 1113, or <a href="mailto:icocasework@ico.org.uk" class="govuk-link">icocasework@ico.org.uk</a>. Any complaint to the Information Commissioner is without prejudice to your right to seek redress through the courts.</p>
 
       <h3 class="govuk-heading-s">Contact details</h3>
-      <p class="govuk-body">The data controller for your personal data is the {{ departmental_owner }}. The contact details for the data controller are: {{ department_address | safe }}.</p>
-      <p class="govuk-body">The contact details for the data controller's Data Protection Officer are: <a href="mailto:dpo@cabinetoffice.gov.uk" class="govuk-link">dpo@cabinetoffice.gov.uk</a>.</p>
+      <p class="govuk-body">The contact details for the data controller are: {{ department_address | safe }}.</p>
       <p class="govuk-body">The Data Protection Officer provides independent advice and monitoring of {{ departmental_owner }}'s use of personal information.</p>
 
       <h2 class="govuk-heading-m">Changes to this notice</h2>

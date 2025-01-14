@@ -9,13 +9,14 @@ from redbox_app.redbox_core.models import File
 from redbox_app.worker import ingest
 
 logger = logging.getLogger(__name__)
-
+logger.warning("inside reingest_files.py")
 env = get_settings()
 
 es_client = env.elasticsearch_client()
 
 
 def switch_aliases(alias, new_index):
+    logger.warning("inside reingest_files.py inside switch_aliases")
     try:
         response = es_client.indices.get_alias(name=alias)
         indices_to_remove = list(response)

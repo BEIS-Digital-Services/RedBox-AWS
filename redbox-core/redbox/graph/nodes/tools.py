@@ -1,4 +1,4 @@
-from typing import Annotated, Any, Iterable, get_args, get_origin, get_type_hints
+from typing import Annotated, Any, Union, Iterable, get_args, get_origin, get_type_hints
 
 import requests
 import tiktoken
@@ -9,7 +9,7 @@ from langchain_core.embeddings.embeddings import Embeddings
 from langchain_core.messages import ToolCall
 from langchain_core.tools import StructuredTool, Tool, tool
 from langgraph.prebuilt import InjectedState
-
+from opensearchpy import OpenSearch
 from redbox.models.chain import RedboxState
 from redbox.models.file import ChunkCreatorType, ChunkMetadata, ChunkResolution
 from redbox.retriever.queries import (
@@ -22,7 +22,18 @@ from redbox.transform import (
     sort_documents,
     structure_documents_by_group_and_indices,
 )
+from redbox.transform import (
+    merge_documents,
+    sort_documents,
+    structure_documents_by_group_and_indices,
+)
+from redbox.models.settings import catch_403
 
+import logging
+
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger()
+log.warning("inside tools.py")
 
 def is_valid_tool(tool: StructuredTool) -> bool:
     """Checks whether the supplied tool will correctly update the state.
@@ -69,15 +80,16 @@ def has_injected_state(tool: StructuredTool) -> bool:
 
     return False
 
-
+@catch_403
 def build_search_documents_tool(
-    es_client: Elasticsearch,
+    es_client: Union[Elasticsearch, OpenSearch],
     index_name: str,
     embedding_model: Embeddings,
     embedding_field_name: str,
     chunk_resolution: ChunkResolution | None,
 ) -> Tool:
     """Constructs a tool that searches the index and sets state["documents"]."""
+    log.warning("inside tools.py inside build_search_documents_tool")
 
     @tool
     def _search_documents(query: str, state: Annotated[RedboxState, InjectedState]) -> dict[str, Any]:
@@ -96,6 +108,8 @@ def build_search_documents_tool(
         Returns:
             dict[str, Any]: A collection of document objects that match the query.
         """
+        log.warning("inside tools.py inside _search_documents")
+        
         query_vector = embedding_model.embed_query(query)
         selected_files = state["request"].s3_keys
         permitted_files = state["request"].permitted_s3_keys
@@ -111,7 +125,9 @@ def build_search_documents_tool(
             chunk_resolution=chunk_resolution,
             ai_settings=ai_settings,
         )
-        initial_documents = query_to_documents(es_client=es_client, index_name=index_name, query=initial_query)
+        initial_documents = query_to_documents(
+            es_client=es_client, index_name=index_name, query=initial_query
+        )
 
         # Handle nothing found (as when no files are permitted)
         if not initial_documents:
@@ -123,10 +139,14 @@ def build_search_documents_tool(
             ai_settings=ai_settings,
             centres=initial_documents,
         )
-        adjacent_boosted = query_to_documents(es_client=es_client, index_name=index_name, query=with_adjacent_query)
+        adjacent_boosted = query_to_documents(
+            es_client=es_client, index_name=index_name, query=with_adjacent_query
+        )
 
         # Merge and sort
-        merged_documents = merge_documents(initial=initial_documents, adjacent=adjacent_boosted)
+        merged_documents = merge_documents(
+            initial=initial_documents, adjacent=adjacent_boosted
+        )
         sorted_documents = sort_documents(documents=merged_documents)
 
         # Return as state update

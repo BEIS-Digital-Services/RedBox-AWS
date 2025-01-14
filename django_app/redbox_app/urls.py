@@ -6,19 +6,24 @@ from django.urls import include, path
 from magic_link import urls as magic_link_urls
 
 from .redbox_core import views
+from redbox_app.redbox_core.views.custom_oidc_views import \
+    CustomOIDCAuthenticationRequestView
 
 admin.site = AdminSitePlus()
 admin.autodiscover()
 
 auth_urlpatterns = [
     path("magic_link/", include(magic_link_urls)),
+    path('oidc/authenticate/', CustomOIDCAuthenticationRequestView.as_view(), name='oidc_authentication_init'),
+    path('oidc/callback/', views.oidc_callback, name='oidc_authentication_callback'),
+    path('oidc/logout/', views.oidc_logout_view, name='oidc_logout'),
     path("sign-in/", views.sign_in_view, name="sign-in"),
-    path(
-        "sign-in-link-sent/",
-        views.sign_in_link_sent_view,
-        name="sign-in-link-sent",
-    ),
-    path("signed-out/", views.signed_out_view, name="signed-out"),
+    #path(
+    #    "sign-in-link-sent/",
+    #    views.sign_in_link_sent_view,
+    #    name="sign-in-link-sent",
+    #),
+    #path("signed-out/", views.signed_out_view, name="signed-out"),
     path("sign-up-page-1", views.Signup1.as_view(), name="sign-up-page-1"),
     path("sign-up-page-2", views.Signup2.as_view(), name="sign-up-page-2"),
     path("sign-up-page-3", views.Signup3.as_view(), name="sign-up-page-3"),
@@ -28,8 +33,8 @@ auth_urlpatterns = [
     path("sign-up-page-7", views.Signup7.as_view(), name="sign-up-page-7"),
 ]
 
-if settings.LOGIN_METHOD == "sso":
-    auth_urlpatterns.append(path("auth/", include("authbroker_client.urls")))
+#if settings.LOGIN_METHOD == "sso":
+#    auth_urlpatterns.append(path("auth/", include("authbroker_client.urls")))
 
 info_urlpatterns = [
     path("privacy-notice/", views.info_views.privacy_notice_view, name="privacy-notice"),
