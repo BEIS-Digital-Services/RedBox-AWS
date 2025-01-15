@@ -66,6 +66,8 @@ class ChatsView(View):
             "current_chat": current_chat,
             "streaming": {"endpoint": str(endpoint)},
             "contact_email": settings.CONTACT_EMAIL,
+            "contact_teams_general": settings.TEAMS_SUPPORT_GENERAL,
+            "contact_teams_support": settings.TEAMS_SUPPORT_TECHNICAL,
             "completed_files": completed_files,
             "processing_files": processing_files,
             "chat_title_length": settings.CHAT_TITLE_LENGTH,

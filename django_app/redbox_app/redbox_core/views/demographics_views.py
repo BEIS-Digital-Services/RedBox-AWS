@@ -9,6 +9,7 @@ from django.shortcuts import redirect
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.generic import UpdateView
+from django.conf import settings
 
 from redbox_app.redbox_core.forms import DemographicsForm
 
@@ -36,6 +37,13 @@ class DemographicsView(LoginRequiredMixin, UpdateView):
 
     def get_object(self, **kwargs):  # noqa: ARG002
         return self.request.user
+    
+    # Add custom context
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["contact_teams_general"] = settings.TEAMS_SUPPORT_GENERAL
+        context["contact_teams_support"] = settings.TEAMS_SUPPORT_TECHNICAL
+        return context
 
 
 class UpdateDemographicsView(View):
