@@ -161,13 +161,15 @@ class UploadView(View):
 
             if contains_special:
                 errors.append(
-                    f"Error with {uploaded_file.name}: We noticed you are uploading a file that, once stripped of special characters, matches a previously uploaded file ({normalized_file_name}). 
-                    Only the following special characters are allowed: - _ . 
-                    Please rename it."
+                    f"Error with {uploaded_file.name}: We noticed you are uploading a file that, "
+                    f"once stripped of special characters, matches a previously uploaded file "
+                    f"({normalized_file_name}).\n"
+                    "Only the following special characters are allowed: - _ .\n"
+                    "Please rename it."
                 )
             else:
                 errors.append(
-                    f"Error with {uploaded_file.name}: This file was already uploaded. "
+                    f"Error with {uploaded_file.name}: This file was already uploaded ({normalized_file_name})"
                     "Please rename it or delete the existing file."
                 )
 
