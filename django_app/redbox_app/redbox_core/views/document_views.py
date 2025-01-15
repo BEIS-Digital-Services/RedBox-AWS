@@ -17,6 +17,7 @@ from django_q.tasks import async_task
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.db.models import F
 from django.conf import settings
+import re
 
 from redbox_app.redbox_core.models import File
 from redbox_app.worker import ingest
@@ -142,6 +143,7 @@ class UploadView(View):
         #logger.warning("Incoming upload filename: %r", file_name)
 
         normalized_file_name = uploaded_file.name.replace(" ", "_").lower()
+        normalized_file_name = re.sub(r"[!£$%^&;@'~#}\]{\[¬`=+,]", "", normalized_file_name)
 
         already_exists = File.objects.filter(
             user=user, 
