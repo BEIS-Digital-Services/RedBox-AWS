@@ -142,8 +142,14 @@ class UploadView(View):
         #logger.warning("For user=%s, active files in DB: %s", user.email, list(active_files))
         #logger.warning("Incoming upload filename: %r", file_name)
 
-        normalized_file_name = uploaded_file.name.replace(" ", "_").lower()
-        normalized_file_name = re.sub(r"[!£$%^&;@'~#}\]{\[¬`=+,]", "", normalized_file_name)
+        # 1) Define the pattern for special characters
+        special_chars_pattern = r"[!£$%^&;@'~#}\]{\[¬`=+,\(\)]"
+
+        # 2) Check if the original filename has special characters
+        contains_special = bool(re.search(special_chars_pattern, uploaded_file.name))
+
+        normalized_file_name = uploaded_file.name.replace(" ", "_")
+        normalized_file_name = re.sub(special_chars_pattern, "", normalized_file_name)
 
         already_exists = File.objects.filter(
             user=user, 
@@ -152,10 +158,18 @@ class UploadView(View):
         ).exists()
 
         if already_exists:
-            errors.append(
-                f"Error with {uploaded_file.name}: This file was already uploaded. "
-                "Please rename it or delete the existing file."
-        )
+
+            if contains_special:
+                errors.append(
+                    f"Error with {uploaded_file.name}: We noticed you are uploading a file that, once stripped of special characters, matches a previously uploaded file ({normalized_file_name}). 
+                    Only the following special characters are allowed: - _ . 
+                    Please rename it."
+                )
+            else:
+                errors.append(
+                    f"Error with {uploaded_file.name}: This file was already uploaded. "
+                    "Please rename it or delete the existing file."
+                )
 
         return errors
 
