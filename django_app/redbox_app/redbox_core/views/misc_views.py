@@ -17,7 +17,7 @@ def homepage_view(request):
     return render(
         request,
         template_name="homepage.html",
-        context={"request": request, "allow_sign_ups": settings.ALLOW_SIGN_UPS},
+        context={"request": request, "allow_sign_ups": settings.ALLOW_SIGN_UPS, "contact_teams_general": settings.TEAMS_SUPPORT_GENERAL, "contact_teams_support": settings.TEAMS_SUPPORT_TECHNICAL},
     )
 
 
@@ -40,5 +40,5 @@ def sitemap_view(request):
     return render(
         request,
         template_name="sitemap.html",
-        context={"request": request, "chat_history": chat_history},
+        context={"request": request, "chat_history": chat_history, "contact_teams_general": settings.TEAMS_SUPPORT_GENERAL, "contact_teams_support": settings.TEAMS_SUPPORT_TECHNICAL},
     )
