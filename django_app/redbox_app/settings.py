@@ -172,6 +172,8 @@ else:
 
 if ENVIRONMENT.is_prod:
     OKTA_DOMAIN = env.str("OKTA_DOMAIN_PROD")
+elif ENVIRONMENT.is_preprod:
+    OKTA_DOMAIN = env.str("OKTA_DOMAIN_PROD")
 else:
     OKTA_DOMAIN = env.str("OKTA_DOMAIN_DEV")
 
