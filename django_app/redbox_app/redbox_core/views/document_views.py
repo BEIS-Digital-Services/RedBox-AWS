@@ -17,6 +17,7 @@ from django_q.tasks import async_task
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.db.models import F
 from django.conf import settings
+import re
 
 from redbox_app.redbox_core.models import File
 from redbox_app.worker import ingest
@@ -67,7 +68,10 @@ class DocumentView(View):
                 "completed_files": completed_files,
                 "processing_files": processing_files,
                 "ingest_errors": ingest_errors,
-                "contact_email": settings.CONTACT_EMAIL, "version": settings.REDBOX_VERSION
+                "contact_email": settings.CONTACT_EMAIL,
+                "version": settings.REDBOX_VERSION,
+                "contact_teams_general": settings.TEAMS_SUPPORT_GENERAL,
+                "contact_teams_support": settings.TEAMS_SUPPORT_TECHNICAL,
             },
         )
 
@@ -105,7 +109,9 @@ class UploadView(View):
             context={
                 "request": request,
                 "errors": {"upload_doc": errors or []},
-                "uploaded": not errors,
+                "uploaded": not errors,                
+                "contact_teams_general": settings.TEAMS_SUPPORT_GENERAL,
+                "contact_teams_support": settings.TEAMS_SUPPORT_TECHNICAL,
             },
         )
 
@@ -141,7 +147,14 @@ class UploadView(View):
         #logger.warning("For user=%s, active files in DB: %s", user.email, list(active_files))
         #logger.warning("Incoming upload filename: %r", file_name)
 
-        normalized_file_name = uploaded_file.name.replace(" ", "_").lower()
+        # 1) Define the pattern for special characters
+        special_chars_pattern = r"[!£$%^&;@'~#}\]{\[¬`=+,\(\)]"
+
+        # 2) Check if the original filename has special characters
+        contains_special = bool(re.search(special_chars_pattern, uploaded_file.name))
+
+        normalized_file_name = uploaded_file.name.replace(" ", "_")
+        normalized_file_name = re.sub(special_chars_pattern, "", normalized_file_name)
 
         already_exists = File.objects.filter(
             user=user, 
@@ -150,10 +163,20 @@ class UploadView(View):
         ).exists()
 
         if already_exists:
-            errors.append(
-                f"Error with {uploaded_file.name}: This file was already uploaded. "
-                "Please rename it or delete the existing file."
-        )
+
+            if contains_special:
+                errors.append(
+                    f"Error with {uploaded_file.name}: We noticed you are uploading a file that, "
+                    f"once stripped of special characters, matches a previously uploaded file "
+                    f"({normalized_file_name}).\n "
+                    "Only the following special characters are allowed: - _ .\n "
+                    "Please rename it."
+                )
+            else:
+                errors.append(
+                    f"Error with {uploaded_file.name}: This file was already uploaded ({normalized_file_name}). "
+                    "Please rename it or delete the existing file."
+                )
 
         return errors
 

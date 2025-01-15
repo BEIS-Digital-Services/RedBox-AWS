@@ -15,6 +15,8 @@ def privacy_notice_view(request):
         request,
         "privacy-notice.html",
         {
+            "contact_teams_general": settings.TEAMS_SUPPORT_GENERAL,
+            "contact_teams_support": settings.TEAMS_SUPPORT_TECHNICAL,
             "waffle_flag": waffle.flag_is_active,
         },
     )
@@ -23,7 +25,7 @@ def privacy_notice_view(request):
 @require_http_methods(["GET"])
 def support_view(request):
     return render(
-        request, "support.html", {"contact_email": settings.CONTACT_EMAIL, "version": settings.REDBOX_VERSION}
+        request, "support.html", {"contact_email": settings.CONTACT_EMAIL, "version": settings.REDBOX_VERSION, "contact_teams_general": settings.TEAMS_SUPPORT_GENERAL, "contact_teams_support": settings.TEAMS_SUPPORT_TECHNICAL}
     )
 
 
@@ -34,6 +36,8 @@ def accessibility_statement_view(request):
         "accessibility-statement.html",
         {
             "contact_email": settings.CONTACT_EMAIL,
+            "contact_teams_general": settings.TEAMS_SUPPORT_GENERAL,
+            "contact_teams_support": settings.TEAMS_SUPPORT_TECHNICAL,
             "waffle_flag": waffle.flag_is_active,
         },
     )

@@ -383,7 +383,7 @@ LOGGING = {
 # Email
 EMAIL_BACKEND_TYPE = env.str("EMAIL_BACKEND_TYPE")
 FROM_EMAIL = env.str("FROM_EMAIL")
-CONTACT_EMAIL = "https://teams.microsoft.com/l/channel/19%3A8a6ce8665e6d48a691d1edb8c403c4cf%40thread.tacv2/Technical%20problems?groupId=14df8cd5-f24f-48f7-abfb-0c9e2e3e3fc8"
+CONTACT_EMAIL = env.str("CONTACT_EMAIL")
 
 if EMAIL_BACKEND_TYPE == "FILE":
     EMAIL_BACKEND = "django.core.mail.backends.filebased.EmailBackend"
@@ -397,6 +397,10 @@ elif EMAIL_BACKEND_TYPE == "GOVUKNOTIFY":
 else:
     message = f"Unknown EMAIL_BACKEND_TYPE of {EMAIL_BACKEND_TYPE}"
     raise ValueError(message)
+
+#Teams contact links
+TEAMS_SUPPORT_GENERAL = env.str("TEAMS_SUPPORT_GENERAL", "https://example.com/")
+TEAMS_SUPPORT_TECHNICAL = env.str("TEAMS_SUPPORT_TECHNICAL", "https://example.com/")
 
 # Magic link
 
