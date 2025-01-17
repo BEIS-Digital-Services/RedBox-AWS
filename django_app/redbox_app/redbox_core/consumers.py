@@ -88,54 +88,68 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def receive(self, text_data=None, bytes_data=None):
         """Receive & respond to message from browser websocket."""
-        self.full_reply = []
-        self.citations = []
-        self.external_citations = []
-        self.route = None
-        self.activities = []
+        try:
+            # Reset state variables
+            self.full_reply = []
+            self.citations = []
+            self.external_citations = []
+            self.route = None
+            self.activities = []
 
-        data = json.loads(text_data or bytes_data)
-        logger.debug("received %s from browser", data)
-        user_message_text: str = data.get("message", "")
-        selected_file_uuids: Sequence[UUID] = [UUID(u) for u in data.get("selectedFiles", [])]
-        activities: Sequence[str] = data.get("activities", [])
-        user: User = self.scope.get("user")
+            data = json.loads(text_data or bytes_data)
+            logger.debug("received %s from browser", data)
 
-        user_ai_settings = await AISettingsModel.objects.aget(label=user.ai_settings_id)
+            user_message_text: str = data.get("message", "")
+            selected_file_uuids: Sequence[UUID] = [UUID(u) for u in data.get("selectedFiles", [])]
+            activities: Sequence[str] = data.get("activities", [])
+            user: User = self.scope.get("user")
 
-        chat_backend = await ChatLLMBackend.objects.aget(id=data.get("llm", user_ai_settings.chat_backend_id))
-        temperature = data.get("temperature", user_ai_settings.temperature)
+            user_ai_settings = await AISettingsModel.objects.aget(label=user.ai_settings_id)
 
-        if session_id := data.get("sessionId"):
-            session = await Chat.objects.aget(id=session_id)
-            session.chat_backend = chat_backend
-            session.temperature = temperature
-            logger.info("updating session: chat_backend=%s temperature=%s", chat_backend, temperature)
-            await session.asave()
-        else:
-            logger.info("creating session: chat_backend=%s temperature=%s", chat_backend, temperature)
-            session = await Chat.objects.acreate(
-                name=user_message_text[: settings.CHAT_TITLE_LENGTH],
-                user=user,
-                chat_backend=chat_backend,
-                temperature=temperature,
-            )
+            chat_backend = await ChatLLMBackend.objects.aget(id=data.get("llm", user_ai_settings.chat_backend_id))
+            temperature = data.get("temperature", user_ai_settings.temperature)
 
-        # save user message
-        permitted_files = File.objects.filter(user=user, status=File.Status.complete)
-        selected_files = permitted_files.filter(id__in=selected_file_uuids)
-        await self.save_user_message(session, user_message_text, selected_files=selected_files, activities=activities)
+            if session_id := data.get("sessionId"):
+                session = await Chat.objects.aget(id=session_id)
+                session.chat_backend = chat_backend
+                session.temperature = temperature
+                logger.info("updating session: chat_backend=%s temperature=%s", chat_backend, temperature)
+                await session.asave()
+            else:
+                logger.info("creating session: chat_backend=%s temperature=%s", chat_backend, temperature)
+                session = await Chat.objects.acreate(
+                    name=user_message_text[: settings.CHAT_TITLE_LENGTH],
+                    user=user,
+                    chat_backend=chat_backend,
+                    temperature=temperature,
+                )
 
-        await self.llm_conversation(selected_files, session, user, user_message_text, permitted_files)
-        await self.close()
+            # Save user message
+            permitted_files = File.objects.filter(user=user, status=File.Status.complete)
+            selected_files = permitted_files.filter(id__in=selected_file_uuids)
+            await self.save_user_message(session, user_message_text, selected_files=selected_files, activities=activities)
+
+            # Process conversation
+            await self.llm_conversation(selected_files, session, user, user_message_text, permitted_files)
+
+        except Exception as e:
+            logger.exception("Error in WebSocket message processing: %s", str(e))
+            self.full_reply = []
+            self.citations = []
+            self.route = None
+            await self.send_to_client("error", {"error": str(e)})
+
+        finally:
+            # Ensure WebSocket connection is closed in all cases
+            if not self.scope.get("_connection_closed", False):
+                logger.warning("Closing unclean connection.")
+                await self.close()
 
     async def llm_conversation(
         self, selected_files: Sequence[File], session: Chat, user: User, title: str, permitted_files: Sequence[File]
     ) -> None:
         """Initiate & close websocket conversation with the core-api message endpoint."""
-
         logger.warning("Starting LLM conversation for session: %s", session.id)
-
         await self.send_to_client("session-id", session.id)
 
         session_messages = ChatMessage.objects.filter(chat=session).order_by("created_at")
@@ -144,10 +158,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         ai_settings = await self.get_ai_settings(session)
         logger.warning("Retrieved AI settings: %s", json.dumps(ai_settings.model_dump(), indent=2))
 
-        # Convert permitted_files QuerySet to a list for safe iteration
         permitted_files_list = await sync_to_async(list)(permitted_files)
-
-        # Log permitted files metadata
         logger.warning("Metadata retrieved for permitted files: %s", json.dumps([
             {"file_name": file.file_name, "unique_name": file.unique_name}
             for file in permitted_files_list
@@ -200,12 +211,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if not selected_files and not message_history[-1].text:
             logger.warning("No files selected and the query is empty. This may cause an issue.")
 
-        # Log the payload before entering the try block
-        try:
-            logger.warning("Preparing to send payload to Bedrock: %s", json.dumps(state.model_dump(), indent=2))
-        except Exception as serialization_error:
-            logger.error("Failed to serialize payload for pre-try logging. Error: %s", str(serialization_error))
-
         try:
             await self.redbox.run(
                 state,
@@ -217,7 +222,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 activity_event_callback=self.handle_activity,
             )
             logger.warning("Successfully received response from Bedrock.")
-
             message = await self.save_ai_message(
                 session,
                 "".join(self.full_reply),
@@ -237,10 +241,24 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
             # Attempt to log the payload for debugging
             try:
-                logger.error("Error during Bedrock invocation. Payload was: %s", json.dumps(state.model_dump(), indent=2))
+                # Serialize using model_dump if available
+                if hasattr(state, "model_dump"):
+                    payload = state.model_dump()
+                # Assume state is a dictionary if no model_dump
+                elif isinstance(state, dict):
+                    payload = state
+                # Fallback to string serialization for any other type
+                else:
+                    payload = str(state)
+
+                # Convert payload to JSON string for logging
+                logger.error("Error during Bedrock invocation. Payload was: %s", json.dumps(payload, indent=2))
             except Exception as payload_error:
-                logger.error("Failed to serialize payload for logging. Error type: %s, Details: %s",
-                            type(payload_error).__name__, str(payload_error))
+                logger.error(
+                    "Failed to serialize payload for logging. Error type: %s, Details: %s",
+                    type(payload_error).__name__,
+                    str(payload_error),
+                )
 
                 # Minimal logging of the state object to still capture some context
                 try:
@@ -254,11 +272,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
             # Re-raise the original exception to propagate it
             raise
-
+        finally:
+            await self.close()
 
     async def send_to_client(self, message_type: str, data: str | Mapping[str, Any] | None = None) -> None:
         message = {"type": message_type, "data": data}
-        logger.debug("sending %s to browser", message)
         logger.warning("Sending message to client: %s", json.dumps(message, default=str, indent=2))
         await self.send(json.dumps(message, default=str))
 

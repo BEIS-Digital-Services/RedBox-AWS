@@ -162,7 +162,9 @@ export class ChatMessage extends HTMLElement {
     // Stop streaming on escape-key or stop-button press
     const stopStreaming = () => {
       this.dataset.status = "stopped";
-      webSocket.close();
+      if (webSocket.readyState === WebSocket.OPEN) {
+        webSocket.close();
+      }
     };
     this.addEventListener("keydown", (evt) => {
       if (evt.key === "Escape" && this.dataset.status === "streaming") {
@@ -187,6 +189,7 @@ export class ChatMessage extends HTMLElement {
     };
 
     webSocket.onerror = (event) => {
+      console.error("WebSocket encountered an error:", event);
       if (!this.responseContainer) {
         return;
       }
@@ -196,6 +199,7 @@ export class ChatMessage extends HTMLElement {
     };
 
     webSocket.onclose = (event) => {
+      console.warn("WebSocket connection closed:", event);
       responseLoading.style.display = "none";
       if (responseComplete) {
         responseComplete.textContent = "Response complete";
