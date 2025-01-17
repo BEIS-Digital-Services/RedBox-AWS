@@ -15,6 +15,7 @@ from django.utils import timezone
 from langchain_core.documents import Document
 from openai import RateLimitError
 from websockets import ConnectionClosedError, WebSocketClientProtocol
+from asgiref.sync import sync_to_async
 
 from redbox import Redbox
 from redbox.models.chain import (
@@ -129,9 +130,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
         ai_settings = await self.get_ai_settings(session)
         logger.warning("Retrieved AI settings: %s", json.dumps(ai_settings.model_dump(), indent=2))
 
+        # Convert permitted_files QuerySet to a list for safe iteration
+        permitted_files_list = await sync_to_async(list)(permitted_files)
+
+        # Log permitted files metadata
         logger.warning("Metadata retrieved for permitted files: %s", json.dumps([
             {"file_name": file.file_name, "unique_name": file.unique_name}
-            for file in permitted_files
+            for file in permitted_files_list
         ], indent=2))
 
         logger.warning("Processed chat history: %s", json.dumps([
@@ -156,8 +161,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             ),
         )
 
-        logger.warning("Constructed RedboxQuery payload:")
-        logger.warning(json.dumps({
+        # Log the constructed RedboxQuery payload
+        logger.warning("Constructed RedboxQuery payload: %s", json.dumps({
             "question": message_history[-1].text,
             "s3_keys": [f.unique_name for f in selected_files],
             "chat_history": [
@@ -165,7 +170,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 for message in message_history[:-1]
             ],
             "ai_settings": ai_settings.model_dump(),
-            "permitted_s3_keys": [f.unique_name async for f in permitted_files],
+            "permitted_s3_keys": [f.unique_name for f in permitted_files_list],
         }, indent=2))
 
         logger.warning("Validation for the RedboxQuery Payload:")
