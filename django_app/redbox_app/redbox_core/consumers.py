@@ -15,6 +15,7 @@ from django.utils import timezone
 from langchain_core.documents import Document
 from openai import RateLimitError
 from websockets import ConnectionClosedError, WebSocketClientProtocol
+from asgiref.sync import sync_to_async
 
 from redbox import Redbox
 from redbox.models.chain import (
@@ -46,6 +47,20 @@ OptFileSeq = Sequence[File] | None
 logger = logging.getLogger(__name__)
 logger.info("WEBSOCKET_SCHEME is: %s", settings.WEBSOCKET_SCHEME)
 
+def convert_to_dict(obj):
+    if isinstance(obj, dict):
+        return obj
+    elif hasattr(obj, "model_dump"):
+        return obj.model_dump()
+    elif hasattr(obj, "__dict__"):
+        return obj.__dict__
+    elif isinstance(obj, list):
+        return [convert_to_dict(item) for item in obj]
+    elif isinstance(obj, (str, int, float, bool, type(None))):  # Simple types
+        return obj
+    else:
+        return str(obj)  # Fallback for non-serializable objects
+
 
 def parse_page_number(obj: int | list[int] | None) -> list[int]:
     if isinstance(obj, int):
@@ -73,57 +88,87 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def receive(self, text_data=None, bytes_data=None):
         """Receive & respond to message from browser websocket."""
-        self.full_reply = []
-        self.citations = []
-        self.external_citations = []
-        self.route = None
-        self.activities = []
+        try:
+            # Reset state variables
+            self.full_reply = []
+            self.citations = []
+            self.external_citations = []
+            self.route = None
+            self.activities = []
 
-        data = json.loads(text_data or bytes_data)
-        logger.debug("received %s from browser", data)
-        user_message_text: str = data.get("message", "")
-        selected_file_uuids: Sequence[UUID] = [UUID(u) for u in data.get("selectedFiles", [])]
-        activities: Sequence[str] = data.get("activities", [])
-        user: User = self.scope.get("user")
+            data = json.loads(text_data or bytes_data)
+            logger.debug("received %s from browser", data)
 
-        user_ai_settings = await AISettingsModel.objects.aget(label=user.ai_settings_id)
+            user_message_text: str = data.get("message", "")
+            selected_file_uuids: Sequence[UUID] = [UUID(u) for u in data.get("selectedFiles", [])]
+            activities: Sequence[str] = data.get("activities", [])
+            user: User = self.scope.get("user")
 
-        chat_backend = await ChatLLMBackend.objects.aget(id=data.get("llm", user_ai_settings.chat_backend_id))
-        temperature = data.get("temperature", user_ai_settings.temperature)
+            user_ai_settings = await AISettingsModel.objects.aget(label=user.ai_settings_id)
 
-        if session_id := data.get("sessionId"):
-            session = await Chat.objects.aget(id=session_id)
-            session.chat_backend = chat_backend
-            session.temperature = temperature
-            logger.info("updating session: chat_backend=%s temperature=%s", chat_backend, temperature)
-            await session.asave()
-        else:
-            logger.info("creating session: chat_backend=%s temperature=%s", chat_backend, temperature)
-            session = await Chat.objects.acreate(
-                name=user_message_text[: settings.CHAT_TITLE_LENGTH],
-                user=user,
-                chat_backend=chat_backend,
-                temperature=temperature,
-            )
+            chat_backend = await ChatLLMBackend.objects.aget(id=data.get("llm", user_ai_settings.chat_backend_id))
+            temperature = data.get("temperature", user_ai_settings.temperature)
 
-        # save user message
-        permitted_files = File.objects.filter(user=user, status=File.Status.complete)
-        selected_files = permitted_files.filter(id__in=selected_file_uuids)
-        await self.save_user_message(session, user_message_text, selected_files=selected_files, activities=activities)
+            if session_id := data.get("sessionId"):
+                session = await Chat.objects.aget(id=session_id)
+                session.chat_backend = chat_backend
+                session.temperature = temperature
+                logger.info("updating session: chat_backend=%s temperature=%s", chat_backend, temperature)
+                await session.asave()
+            else:
+                logger.info("creating session: chat_backend=%s temperature=%s", chat_backend, temperature)
+                session = await Chat.objects.acreate(
+                    name=user_message_text[: settings.CHAT_TITLE_LENGTH],
+                    user=user,
+                    chat_backend=chat_backend,
+                    temperature=temperature,
+                )
 
-        await self.llm_conversation(selected_files, session, user, user_message_text, permitted_files)
-        await self.close()
+            # Save user message
+            permitted_files = File.objects.filter(user=user, status=File.Status.complete)
+            selected_files = permitted_files.filter(id__in=selected_file_uuids)
+            await self.save_user_message(session, user_message_text, selected_files=selected_files, activities=activities)
+
+            # Process conversation
+            await self.llm_conversation(selected_files, session, user, user_message_text, permitted_files)
+
+        except Exception as e:
+            logger.exception("Error in WebSocket message processing: %s", str(e))
+            self.full_reply = []
+            self.citations = []
+            self.route = None
+            await self.send_to_client("error", {"error": str(e)})
+
+        finally:
+            # Ensure WebSocket connection is closed in all cases
+            if not self.scope.get("_connection_closed", False):
+                logger.warning("Closing unclean connection.")
+                await self.close()
 
     async def llm_conversation(
         self, selected_files: Sequence[File], session: Chat, user: User, title: str, permitted_files: Sequence[File]
     ) -> None:
         """Initiate & close websocket conversation with the core-api message endpoint."""
+        logger.warning("Starting LLM conversation for session: %s", session.id)
         await self.send_to_client("session-id", session.id)
 
         session_messages = ChatMessage.objects.filter(chat=session).order_by("created_at")
         message_history: Sequence[Mapping[str, str]] = [message async for message in session_messages]
 
         ai_settings = await self.get_ai_settings(session)
+        logger.warning("Retrieved AI settings: %s", json.dumps(ai_settings.model_dump(), indent=2))
+
+        permitted_files_list = await sync_to_async(list)(permitted_files)
+        logger.warning("Metadata retrieved for permitted files: %s", json.dumps([
+            {"file_name": file.file_name, "unique_name": file.unique_name}
+            for file in permitted_files_list
+        ], indent=2))
+
+        logger.warning("Processed chat history: %s", json.dumps([
+            {"role": message.role, "text": escape_curly_brackets(message.text)}
+            for message in message_history
+        ], indent=2))
+
         state = RedboxState(
             request=RedboxQuery(
                 question=message_history[-1].text,
@@ -141,6 +186,31 @@ class ChatConsumer(AsyncWebsocketConsumer):
             ),
         )
 
+        # Log the constructed RedboxQuery payload
+        logger.warning("Constructed RedboxQuery payload: %s", json.dumps({
+            "question": message_history[-1].text,
+            "s3_keys": [f.unique_name for f in selected_files],
+            "chat_history": [
+                {"role": message.role, "text": escape_curly_brackets(message.text)}
+                for message in message_history[:-1]
+            ],
+            "ai_settings": ai_settings.model_dump(),
+            "permitted_s3_keys": [f.unique_name for f in permitted_files_list],
+        }, indent=2))
+
+        logger.warning("Validation for the RedboxQuery Payload:")
+        if not message_history[-1].text:
+            logger.error("The 'question' field is empty in RedboxQuery!")
+            raise ValueError("The 'question' field must not be empty.")
+
+        for i, message in enumerate(message_history[:-1]):
+            if not message.text:
+                logger.error(f"Message {i} in 'chat_history' has empty content: {message}")
+                raise ValueError(f"Invalid message at index {i}: {message}")
+
+        if not selected_files and not message_history[-1].text:
+            logger.warning("No files selected and the query is empty. This may cause an issue.")
+
         try:
             await self.redbox.run(
                 state,
@@ -151,12 +221,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 metadata_tokens_callback=self.handle_metadata,
                 activity_event_callback=self.handle_activity,
             )
-
+            logger.warning("Successfully received response from Bedrock.")
             message = await self.save_ai_message(
                 session,
                 "".join(self.full_reply),
             )
             await self.send_to_client("end", {"message_id": message.id, "title": title, "session_id": session.id})
+            logger.warning("Finished LLM conversation for session: %s", session.id)
 
         except RateLimitError as e:
             logger.exception("Rate limit error", exc_info=e)
@@ -165,12 +236,48 @@ class ChatConsumer(AsyncWebsocketConsumer):
             logger.exception("Error from core.", exc_info=e)
             await self.send_to_client("error", error_messages.CORE_ERROR_MESSAGE)
         except Exception as e:
-            logger.exception("General error.", exc_info=e)
+            # Log the exception details with traceback
+            logger.exception("General error encountered during Bedrock invocation.", exc_info=e)
+
+            # Attempt to log the payload for debugging
+            try:
+                # Serialize using model_dump if available
+                if hasattr(state, "model_dump"):
+                    payload = state.model_dump()
+                # Assume state is a dictionary if no model_dump
+                elif isinstance(state, dict):
+                    payload = state
+                # Fallback to string serialization for any other type
+                else:
+                    payload = str(state)
+
+                # Convert payload to JSON string for logging
+                logger.error("Error during Bedrock invocation. Payload was: %s", json.dumps(payload, indent=2))
+            except Exception as payload_error:
+                logger.error(
+                    "Failed to serialize payload for logging. Error type: %s, Details: %s",
+                    type(payload_error).__name__,
+                    str(payload_error),
+                )
+
+                # Minimal logging of the state object to still capture some context
+                try:
+                    logger.error("State object type: %s, RedboxQuery question: %s",
+                                type(state), state.request.question if hasattr(state, 'request') else "Unknown")
+                except Exception as minimal_log_error:
+                    logger.error("Failed to log minimal state information. Error: %s", str(minimal_log_error))
+
+            # Notify the client of the error
             await self.send_to_client("error", error_messages.CORE_ERROR_MESSAGE)
+
+            # Re-raise the original exception to propagate it
+            raise
+        finally:
+            await self.close()
 
     async def send_to_client(self, message_type: str, data: str | Mapping[str, Any] | None = None) -> None:
         message = {"type": message_type, "data": data}
-        logger.debug("sending %s to browser", message)
+        logger.warning("Sending message to client: %s", json.dumps(message, default=str, indent=2))
         await self.send(json.dumps(message, default=str))
 
     @staticmethod
@@ -276,17 +383,25 @@ class ChatConsumer(AsyncWebsocketConsumer):
         return AISettings.model_validate(ai_settings)
 
     async def handle_text(self, response: str) -> str:
+        logger.warning("Text response received from Bedrock: %s", convert_to_dict(response))
         await self.send_to_client("text", response)
         self.full_reply.append(response)
 
     async def handle_route(self, response: str) -> str:
+        logger.warning("Route response received: %s", convert_to_dict(response))
         await self.send_to_client("route", response)
         self.route = response
 
     async def handle_metadata(self, response: dict):
+        try:
+            # Convert the response to a JSON-serializable dictionary
+            logger.warning("Metadata received: %s", json.dumps(convert_to_dict(response), indent=2))
+        except Exception as serialization_error:
+            logger.error("Failed to serialize metadata response for logging. Error: %s", str(serialization_error))
         self.metadata = metadata_reducer(self.metadata, RequestMetadata.model_validate(response))
 
     async def handle_activity(self, response: dict):
+        logger.warning("Activity received: %s", json.dumps(convert_to_dict(response), indent=2))
         await self.send_to_client("activity", response.message)
         self.activities.append(RedboxActivityEvent.model_validate(response))
 
@@ -294,6 +409,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
         """
         Map documents used to create answer to AICitations for storing as citations
         """
+        try:
+            logger.warning("Documents received from Bedrock: %s", json.dumps([
+                {"uri": doc.metadata.get("uri"), "content": convert_to_dict(doc.page_content)}
+                for doc in response
+            ], indent=2))
+        except Exception as e:
+            logger.error("Failed to serialize documents: %s", str(e))
+        
         sources_by_resource_ref: dict[str, Document] = defaultdict(list)
         for document in response:
             ref = document.metadata.get("uri")
@@ -335,6 +458,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
         Map AICitations used to create answer to AICitations for storing as citations. The link to user files
         must be populated
         """
+        try:
+            logger.warning("Citations received: %s", json.dumps([
+                {"text_in_answer": c.text_in_answer, "sources": [convert_to_dict(s.source) for s in c.sources]}
+                for c in citations
+            ], indent=2))
+        except Exception as e:
+            logger.error("Failed to serialize citations: %s", str(e))
+        
         for c in citations:
             for s in c.sources:
                 try:
@@ -347,4 +478,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 self.citations.append((file, AICitation(text_in_answer=c.text_in_answer, sources=[s])))
 
     async def handle_activity_event(self, event: RedboxActivityEvent):
+        try:
+            logger.warning("Activity event received: %s", json.dumps({
+                "message": event.message if hasattr(event, 'message') else "No message",
+                "other_data": convert_to_dict(event.__dict__) if hasattr(event, '__dict__') else "No additional data"
+            }, indent=2))
+        except Exception as e:
+            logger.error("Failed to serialize activity event: %s", str(e))
+
         logger.info("ACTIVITY: %s", event.message)
