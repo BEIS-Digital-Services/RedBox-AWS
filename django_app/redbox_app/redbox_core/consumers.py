@@ -47,6 +47,20 @@ OptFileSeq = Sequence[File] | None
 logger = logging.getLogger(__name__)
 logger.info("WEBSOCKET_SCHEME is: %s", settings.WEBSOCKET_SCHEME)
 
+def convert_to_dict(obj):
+    if isinstance(obj, dict):
+        return obj
+    elif hasattr(obj, "model_dump"):
+        return obj.model_dump()
+    elif hasattr(obj, "__dict__"):
+        return obj.__dict__
+    elif isinstance(obj, list):
+        return [convert_to_dict(item) for item in obj]
+    elif isinstance(obj, (str, int, float, bool, type(None))):  # Simple types
+        return obj
+    else:
+        return str(obj)  # Fallback for non-serializable objects
+
 
 def parse_page_number(obj: int | list[int] | None) -> list[int]:
     if isinstance(obj, int):
@@ -351,21 +365,25 @@ class ChatConsumer(AsyncWebsocketConsumer):
         return AISettings.model_validate(ai_settings)
 
     async def handle_text(self, response: str) -> str:
-        logger.warning("Text response received from Bedrock: %s", response)
+        logger.warning("Text response received from Bedrock: %s", convert_to_dict(response))
         await self.send_to_client("text", response)
         self.full_reply.append(response)
 
     async def handle_route(self, response: str) -> str:
-        logger.warning("Route response received: %s", response)
+        logger.warning("Route response received: %s", convert_to_dict(response))
         await self.send_to_client("route", response)
         self.route = response
 
     async def handle_metadata(self, response: dict):
-        logger.warning("Metadata received: %s", json.dumps(response, indent=2))
+        try:
+            # Convert the response to a JSON-serializable dictionary
+            logger.warning("Metadata received: %s", json.dumps(convert_to_dict(response), indent=2))
+        except Exception as serialization_error:
+            logger.error("Failed to serialize metadata response for logging. Error: %s", str(serialization_error))
         self.metadata = metadata_reducer(self.metadata, RequestMetadata.model_validate(response))
 
     async def handle_activity(self, response: dict):
-        logger.warning("Activity received: %s", response.message if hasattr(response, 'message') else response)
+        logger.warning("Activity received: %s", json.dumps(convert_to_dict(response), indent=2))
         await self.send_to_client("activity", response.message)
         self.activities.append(RedboxActivityEvent.model_validate(response))
 
@@ -373,10 +391,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
         """
         Map documents used to create answer to AICitations for storing as citations
         """
-        logger.warning("Documents received from Bedrock: %s", json.dumps([
-            {"uri": doc.metadata.get("uri"), "content": doc.page_content}
-            for doc in response
-        ], indent=2))
+        try:
+            logger.warning("Documents received from Bedrock: %s", json.dumps([
+                {"uri": doc.metadata.get("uri"), "content": convert_to_dict(doc.page_content)}
+                for doc in response
+            ], indent=2))
+        except Exception as e:
+            logger.error("Failed to serialize documents: %s", str(e))
         
         sources_by_resource_ref: dict[str, Document] = defaultdict(list)
         for document in response:
@@ -419,10 +440,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
         Map AICitations used to create answer to AICitations for storing as citations. The link to user files
         must be populated
         """
-        logger.warning("Citations received: %s", json.dumps([
-            {"text_in_answer": c.text_in_answer, "sources": [s.source for s in c.sources]}
-            for c in citations
-        ], indent=2))
+        try:
+            logger.warning("Citations received: %s", json.dumps([
+                {"text_in_answer": c.text_in_answer, "sources": [convert_to_dict(s.source) for s in c.sources]}
+                for c in citations
+            ], indent=2))
+        except Exception as e:
+            logger.error("Failed to serialize citations: %s", str(e))
         
         for c in citations:
             for s in c.sources:
@@ -436,5 +460,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 self.citations.append((file, AICitation(text_in_answer=c.text_in_answer, sources=[s])))
 
     async def handle_activity_event(self, event: RedboxActivityEvent):
-        logger.warning("Activity event received: %s", event.message)
+        try:
+            logger.warning("Activity event received: %s", json.dumps({
+                "message": event.message if hasattr(event, 'message') else "No message",
+                "other_data": convert_to_dict(event.__dict__) if hasattr(event, '__dict__') else "No additional data"
+            }, indent=2))
+        except Exception as e:
+            logger.error("Failed to serialize activity event: %s", str(e))
+
         logger.info("ACTIVITY: %s", event.message)
