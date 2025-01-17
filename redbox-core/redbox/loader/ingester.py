@@ -63,7 +63,7 @@ else:
     session = boto3.Session()
     credentials = session.get_credentials()
     region = "eu-west-2"
-    auth = AWSV4SignerAuth(credentials.get_frozen_credentials(), region)
+    auth = AWSV4SignerAuth(credentials, region)
     wrapped_auth = CustomAuthWrapper(auth)
 
     
