@@ -60,6 +60,11 @@ class DocumentView(View):
         ingest_errors = request.session.get("ingest_errors", [])
         request.session["ingest_errors"] = []
 
+        # Extract errors from processing files
+        file_errors = {
+            file.original_file.name: file.ingest_error for file in processing_files if file.ingest_error
+        }
+
         return render(
             request,
             template_name="documents.html",
@@ -67,6 +72,7 @@ class DocumentView(View):
                 "request": request,
                 "completed_files": completed_files,
                 "processing_files": processing_files,
+                "file_errors": file_errors,  # Send errors to template
                 "ingest_errors": ingest_errors,
                 "contact_email": settings.CONTACT_EMAIL,
                 "version": settings.REDBOX_VERSION,
