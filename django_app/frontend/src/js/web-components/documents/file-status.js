@@ -38,7 +38,7 @@ customElements.define("file-status", FileStatus);
 // Error Handling Logic (Add this inside file-status.js)
 function updateErrorMessage() {
   const errorDiv = document.querySelector(".rb-docs__upload-error");
-  const errorText = errorDiv.querySelector("p.govuk-!-margin-0");
+  const errorText = errorDiv.querySelector("p[class~='govuk-!-margin-0']");
   let errorMessages = [];
 
   document.querySelectorAll("file-status[data-status='error']").forEach(fileStatus => {
