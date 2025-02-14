@@ -60,11 +60,6 @@ class DocumentView(View):
         ingest_errors = request.session.get("ingest_errors", [])
         request.session["ingest_errors"] = []
 
-        # Extract errors from processing files
-        file_errors = {
-            file.original_file.name: file.ingest_error for file in processing_files if file.ingest_error
-        }
-
         return render(
             request,
             template_name="documents.html",
@@ -72,7 +67,6 @@ class DocumentView(View):
                 "request": request,
                 "completed_files": completed_files,
                 "processing_files": processing_files,
-                "file_errors": file_errors,  # Send errors to template
                 "ingest_errors": ingest_errors,
                 "contact_email": settings.CONTACT_EMAIL,
                 "version": settings.REDBOX_VERSION,
@@ -237,10 +231,10 @@ def file_status_api_view(request: HttpRequest) -> JsonResponse:
     file_id = request.GET.get("id", None)
     if not file_id:
         logger.error("Error getting file object information - no file ID provided %s.")
-        return JsonResponse({"status": File.Status.errored.label})
+        return JsonResponse({"status": File.Status.errored.label, "ingest_error": "Unknown error"})
     try:
         file: File = get_object_or_404(File, id=file_id)
     except File.DoesNotExist as ex:
         logger.exception("File object information not found in django - file does not exist %s.", file_id, exc_info=ex)
-        return JsonResponse({"status": File.Status.errored.label})
-    return JsonResponse({"status": file.get_status_text()})
+        return JsonResponse({"status": File.Status.errored.label, "ingest_error": "File not found"})
+    return JsonResponse({"status": file.get_status_text(), "ingest_error": file.ingest_error or ""})
