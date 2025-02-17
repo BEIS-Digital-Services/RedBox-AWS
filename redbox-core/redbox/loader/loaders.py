@@ -10,6 +10,7 @@ import tiktoken
 from langchain_core.documents import Document
 import re
 from django.core.exceptions import ValidationError
+from requests.exceptions import ConnectionError
 
 
 from redbox.chains.components import get_chat_llm
@@ -17,6 +18,7 @@ from redbox.models.file import ChunkResolution, UploadedFileMetadata
 from redbox.models.settings import Settings
 from redbox.models.chain import GeneratedMetadata
 import json
+import time
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
@@ -41,30 +43,47 @@ class MetadataLoader:
 
     def _chunking(self) -> list[dict]:
         """
-        Chunking data using local unstructured
+        Chunking data using local unstructured. Retries on ConnectionError caused by NameResolutionError.
         """
         file_bytes = self._get_file_bytes(s3_client=self.s3_client, file_name=self.file_name)
         url = f"http://{self.env.unstructured_host}:8000/general/v0/general"
-        files = {
-            "files": (self.file_name, file_bytes),
-        }
-        response = requests.post(
-            url,
-            files=files,
-            data={
-                "strategy": "fast",
-                "chunking_strategy": "by_title",
-                "max_characters": self.env.worker_ingest_max_chunk_size,
-                "combine_under_n_chars": self.env.worker_ingest_min_chunk_size,
-                "overlap": 0,
-                "overlap_all": True,
-            },
-        )
+        files = {"files": (self.file_name, file_bytes)}
 
-        if response.status_code != 200:
-            raise ValueError(response.text)
+        max_retries = 3
+        retry_delay = 300  # 5 minutes in seconds
 
-        return response.json() or []
+        for attempt in range(max_retries):
+            try:
+                response = requests.post(
+                    url,
+                    files=files,
+                    data={
+                        "strategy": "fast",
+                        "chunking_strategy": "by_title",
+                        "max_characters": self.env.worker_ingest_max_chunk_size,
+                        "combine_under_n_chars": self.env.worker_ingest_min_chunk_size,
+                        "overlap": 0,
+                        "overlap_all": True,
+                    },
+                )
+
+                if response.status_code == 200:
+                    return response.json() or []
+
+                raise ValueError(response.text)
+
+            except ConnectionError as e:
+                # Check if error is specifically due to NameResolutionError
+                if "NameResolutionError" in str(e) or "[Errno -2] Name or service not known" in str(e):
+                    if attempt < max_retries - 1:
+                        logger.warning(f"Connection error encountered. Retrying in {retry_delay} seconds...")
+                        time.sleep(retry_delay)
+                    else:
+                        logger.warning("Max retries reached. Giving up.")
+                        raise ValueError(response.text)
+                else:
+                    raise  # Raise other connection errors immediately
+
 
     def extract_metadata(self) -> GeneratedMetadata:
         """
