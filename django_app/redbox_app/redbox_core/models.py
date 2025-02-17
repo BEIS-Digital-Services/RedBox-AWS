@@ -640,7 +640,7 @@ class File(UUIDPrimaryKeyBase, TimeStampedModel):
 
     def get_status_text(self) -> str:
         permanent_error = "Error"
-        temporary_error = "Error, please try again"
+        temporary_error = "Connection Error. Please retry in 5 minutes. If issue persists, file may be too large."
         if self.ingest_error:
             temporary_error_substrings = [
                 "ConnectionError",
