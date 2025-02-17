@@ -15,7 +15,7 @@ class FileStatus extends HTMLElement {
       this.dataset.status = responseObj.status.toLowerCase();
 
       // Store the ingest error if the file errored
-      if (responseObj.status.toLowerCase() === "error" ||  responseObj.status.toLowerCase() === "error, please try again") {
+      if (responseObj.status.toLowerCase() === "error" ||  responseObj.status.toLowerCase() === "connection error. please retry in 5 minutes. if issue persists, file may be too large.") {
         this.dataset.errorMessage = responseObj.ingest_error || "Unknown error occurred";
         updateErrorMessage(); // Call the function when an error occurs
       }
@@ -45,7 +45,7 @@ function updateErrorMessage() {
       let fileName = fileStatus.closest("tr").querySelector(".iai-doc-list__cell--file-name").innerText;
       let errorMessage = fileStatus.dataset.errorMessage.trim();
 
-      if (fileStatus.dataset.status === "error, please try again") {
+      if (fileStatus.dataset.status === "connection error. please retry in 5 minutes. if issue persists, file may be too large.") {
 
         if (errorMessage.includes("RemoteDisconnected")) {
           errorMessages.push(`Error with ${fileName}: File exceeds token limits.`);
