@@ -15,7 +15,7 @@ class FileStatus extends HTMLElement {
       this.dataset.status = responseObj.status.toLowerCase();
 
       // Store the ingest error if the file errored
-      if (responseObj.status.toLowerCase() === "error") {
+      if (responseObj.status.toLowerCase() === "error" ||  responseObj.status.toLowerCase() === "error, please try again") {
         this.dataset.errorMessage = responseObj.ingest_error || "Unknown error occurred";
         updateErrorMessage(); // Call the function when an error occurs
       }
@@ -45,17 +45,28 @@ function updateErrorMessage() {
       let fileName = fileStatus.closest("tr").querySelector(".iai-doc-list__cell--file-name").innerText;
       let errorMessage = fileStatus.dataset.errorMessage.trim();
 
-      if (errorMessage.includes("expected maxLength: 50000")) {
+      if (fileStatus.dataset.status === "error, please try again") {
+
+        if (errorMessage.includes("RemoteDisconnected")) {
           errorMessages.push(`Error with ${fileName}: File exceeds token limits.`);
-      } else if (errorMessage.includes("Increase the value of [bulk_size]")) {
-          errorMessages.push(`Error with ${fileName}: File exceeds token limits.`);
-      } else if (errorMessage.includes("Too many input tokens. Max input tokens: 8192")) {
-          errorMessages.push(`Error with ${fileName}: File exceeds token limits.`);
-      } else if (errorMessage.includes("RemoteDisconnected")) {
-        errorMessages.push(`Error with ${fileName}: File exceeds token limits.`);
-      } else if (errorMessage.includes("Unstructured failed to extract text")) {
-        errorMessages.push(`Error with ${fileName}: Unable to extract content from this file.`);
+        } else {
+          errorMessages.push(`Timeout - unable to process ${fileName}: Please contact us on the Teams Support channel with this error message.`);
+        }
       }
+      else if (fileStatus.dataset.status === "error"){
+        if (errorMessage.includes("expected maxLength: 50000")) {
+          errorMessages.push(`Error with ${fileName}: File exceeds token limits.`);
+        } else if (errorMessage.includes("Increase the value of [bulk_size]")) {
+            errorMessages.push(`Error with ${fileName}: File exceeds token limits.`);
+        } else if (errorMessage.includes("Too many input tokens. Max input tokens: 8192")) {
+            errorMessages.push(`Error with ${fileName}: File exceeds token limits.`);
+        } else if (errorMessage.includes("Unstructured failed to extract text")) {
+          errorMessages.push(`Error with ${fileName}: Unable to extract content from this file.`);
+        } else {
+          errorMessages.push(`Other error - unable to process ${fileName}: Please contact us on the Teams Support channel with this error message.`);
+        }
+      }
+
   });
 
   if (errorMessages.length > 0) {
